@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum VerificationPurpose {
+  REGISTER
+  LOGIN
+  RESET_PASSWORD
+}
+
+enum NewsSourceType {
+  EXCHANGE
+  RSS
+  API
+  SOCIAL
+}
+
+enum ConfigScope {
+  GLOBAL
+  USER
+}
+
+enum MarketType {
+  SPOT
+  PERPETUAL
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_MARKET
+  STOP_LIMIT
+}
+
+enum OrderStatus {
+  PENDING
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  REJECTED
+  LIQUIDATED
+}
+
+enum MarginMode {
+  CROSS
+  ISOLATED
+}
+
+enum UpdateStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model User {
+  id               String                 @id @default(cuid())
+  email            String                 @unique
+  passwordHash     String
+  displayName      String?
+  preferredLocale  String                 @default("zh-CN")
+  role             UserRole               @default(USER)
+  emailVerifiedAt  DateTime?
+  isActive         Boolean                @default(true)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  portfolios       Portfolio[]
+  aiConfigs        AiProviderConfig[]
+  aiDecisionLogs   AiDecisionLog[]
+  orders           Order[]
+  auditLogs        AuditLog[]
+  requestedUpdates SystemUpdateLog[]      @relation("RequestedUpdates")
+}
+
+model EmailVerificationCode {
+  id         String              @id @default(cuid())
+  email      String
+  code       String
+  purpose    VerificationPurpose
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([email, purpose, expiresAt])
+}
+
+model AdminConfig {
+  id              String   @id @default("singleton")
+  siteName        String   @default("Crypto Intel Papertrade")
+  defaultLocale   String   @default("zh-CN")
+  smtpHost        String?
+  smtpPort        Int?
+  smtpUser        String?
+  smtpPasswordEnc String?
+  smtpFromEmail   String?
+  smtpFromName    String?
+  githubOwner     String?
+  githubRepo      String?
+  ghcrImage       String?
+  updateChannel   String   @default("main")
+  maintenanceMode Boolean  @default(false)
+  riskDefaults    Json?
+  siteSettings    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SourceConfig {
+  id           String         @id @default(cuid())
+  name         String         @unique
+  kind         NewsSourceType
+  enabled      Boolean        @default(true)
+  baseUrl      String?
+  apiKeyEnc    String?
+  options      Json?
+  lastSyncedAt DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model AiProviderConfig {
+  id             String      @id @default(cuid())
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope          ConfigScope @default(USER)
+  name           String
+  baseUrl        String
+  apiKeyEnc      String
+  model          String
+  systemPrompt   String
+  maxPositionUsd Float       @default(100)
+  allowedMarkets Json?
+  riskLimits     Json?
+  isEnabled      Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Portfolio {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  isPrimary      Boolean          @default(false)
+  totalEquityUsd Float            @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  balances       WalletBalance[]
+  orders         Order[]
+  positions      Position[]
+  fundingLedgers FundingLedger[]
+  liquidations   LiquidationEvent[]
+}
+
+model WalletBalance {
+  id          String     @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset       String
+  marketType  MarketType
+  available   Float      @default(0)
+  locked      Float      @default(0)
+  borrowed    Float      @default(0)
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([portfolioId, asset, marketType])
+}
+
+model Position {
+  id                     String             @id @default(cuid())
+  portfolioId            String
+  portfolio              Portfolio          @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  marketType             MarketType
+  instrument             String
+  side                   OrderSide
+  quantity               Float
+  entryPrice             Float
+  markPrice              Float
+  leverage               Float              @default(1)
+  marginMode             MarginMode         @default(ISOLATED)
+  maintenanceMarginRatio Float              @default(0.005)
+  unrealizedPnlUsd       Float              @default(0)
+  liquidationPrice       Float?
+  takeProfit             Float?
+  stopLoss               Float?
+  openedAt               DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  orders                 Order[]
+  liquidations           LiquidationEvent[]
+
+  @@index([portfolioId, instrument])
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  portfolioId      String
+  portfolio        Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positionId       String?
+  position         Position?   @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  source           String      @default("manual")
+  exchange         String
+  marketType       MarketType
+  instrument       String
+  side             OrderSide
+  orderType        OrderType
+  status           OrderStatus @default(PENDING)
+  quantity         Float
+  filledQuantity   Float       @default(0)
+  limitPrice       Float?
+  stopPrice        Float?
+  leverage         Float       @default(1)
+  marginMode       MarginMode  @default(ISOLATED)
+  reduceOnly       Boolean     @default(false)
+  takeProfit       Float?
+  stopLoss         Float?
+  feesUsd          Float       @default(0)
+  averageFillPrice Float?
+  notionalUsd      Float?
+  reason           String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  fills            Fill[]
+
+  @@index([portfolioId, instrument, createdAt])
+}
+
+model Fill {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  price      Float
+  quantity   Float
+  feeUsd     Float    @default(0)
+  feeAsset   String?
+  executedAt DateTime @default(now())
+}
+
+model FundingLedger {
+  id          String    @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument  String
+  amountUsd   Float
+  rate        Float
+  settledAt   DateTime  @default(now())
+}
+
+model LiquidationEvent {
+  id          String    @id @default(cuid())
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  positionId  String
+  position    Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  markPrice   Float
+  lossUsd     Float
+  createdAt   DateTime  @default(now())
+}
+
+model NewsItem {
+  id              String         @id @default(cuid())
+  sourceName      String
+  sourceType      NewsSourceType
+  title           String
+  summary         String?
+  url             String         @unique
+  language        String         @default("zh-CN")
+  symbols         Json?
+  category        String?
+  importanceScore Float          @default(0.5)
+  publishedAt     DateTime?
+  discoveredAt    DateTime       @default(now())
+}
+
+model Announcement {
+  id           String   @id @default(cuid())
+  exchange     String
+  title        String
+  summary      String?
+  url          String   @unique
+  symbols      Json?
+  category     String?
+  publishedAt  DateTime?
+  discoveredAt DateTime @default(now())
+}
+
+model MarketSnapshot {
+  id                    String   @id @default(cuid())
+  exchange              String
+  instrument            String
+  bid                   Float?
+  ask                   Float?
+  last                  Float?
+  volume24h             Float?
+  priceChangePercent24h Float?
+  metadata              Json?
+  observedAt            DateTime @default(now())
+
+  @@unique([exchange, instrument])
+}
+
+model AiDecisionLog {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerConfigId String?
+  instrument       String?
+  marketType       MarketType?
+  promptDigest     String?
+  rawSignal        Json?
+  normalizedSignal Json?
+  executionStatus  String
+  rejectionReason  String?
+  createdAt        DateTime    @default(now())
+}
+
+model SystemUpdateLog {
+  id            String       @id @default(cuid())
+  requestedById String?
+  requestedBy   User?        @relation("RequestedUpdates", fields: [requestedById], references: [id], onDelete: SetNull)
+  status        UpdateStatus @default(PENDING)
+  startedAt     DateTime     @default(now())
+  finishedAt    DateTime?
+  commitHash    String?
+  imageTag      String?
+  logPath       String?
+  message       String?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String?
+  targetId   String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+}
