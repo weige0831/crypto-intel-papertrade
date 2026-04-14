@@ -26,9 +26,9 @@ const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional().or(z.literal("")),
   SMTP_FROM_EMAIL: z.string().optional().or(z.literal("")),
   SMTP_FROM_NAME: z.string().default("Crypto Intel"),
-  GITHUB_OWNER: z.string().default("your-github-username"),
+  GITHUB_OWNER: z.string().default("weige0831"),
   GITHUB_REPO: z.string().default("crypto-intel-papertrade"),
-  GHCR_IMAGE: z.string().default("ghcr.io/your-github-username/crypto-intel-papertrade"),
+  GHCR_IMAGE: z.string().default("ghcr.io/weige0831/crypto-intel-papertrade"),
   UPDATE_CHANNEL: z.string().default("main"),
   UPDATE_SCRIPT_PATH: z.string().default("./scripts/update.sh"),
   ALLOW_SYSTEM_UPDATE: z

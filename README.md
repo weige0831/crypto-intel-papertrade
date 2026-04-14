@@ -59,7 +59,7 @@ npm run worker
 The repo is designed for a Linux host. Typical flow:
 
 ```bash
-export GITHUB_OWNER=your-user
+export GITHUB_OWNER=weige0831
 git clone https://github.com/$GITHUB_OWNER/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
 cp .env.example .env
