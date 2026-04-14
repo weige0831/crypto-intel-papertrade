@@ -15,7 +15,19 @@ export default async function Home({
 }) {
   const locale = resolveLocale((await searchParams).lang);
   const dict = getDictionary(locale);
-  const [metrics, market] = await Promise.all([getHomeMetrics(), getMarketPageData()]);
+  const [metrics, market] = await Promise.all([getHomeMetrics(locale), getMarketPageData(locale)]);
+  const isZh = locale === "zh-CN";
+
+  const copy = {
+    volume24h: isZh ? "24 小时成交额" : "24h volume",
+    eventBus: isZh ? "实时事件总线" : "Live event bus",
+    eventBusEye: isZh ? "SSE + Redis" : "SSE + Redis",
+    announcements: isZh ? "交易所公告" : "Exchange announcements",
+    lanes: isZh ? "平台能力" : "Platform lanes",
+    capabilities: isZh ? "能力概览" : "Capabilities",
+    marketDesc: isZh ? "跟踪 Binance + OKX 行情、交易所公告和外部新闻。" : "Track Binance + OKX tickers, announcements, and external news.",
+    adminDesc: isZh ? "配置 SMTP、AI 默认参数、GitHub 更新目标和系统状态。" : "Configure SMTP, AI defaults, GitHub update targets, and system health.",
+  };
 
   return (
     <AppShell locale={locale} title={dict.home.title} subtitle={dict.home.subtitle}>
@@ -46,19 +58,21 @@ export default async function Home({
                     </StatusPill>
                   </div>
                   <p className="mt-4 text-2xl font-semibold">{formatUsd(snapshot.last ?? 0)}</p>
-                  <p className="mt-1 text-sm text-zinc-400">24h volume {formatUsd(snapshot.volume24h ?? 0)}</p>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    {copy.volume24h} {formatUsd(snapshot.volume24h ?? 0)}
+                  </p>
                 </div>
               ))}
             </div>
           </Panel>
 
-          <Panel title="Live event bus" eyebrow="SSE + Redis">
-            <LiveEventStream />
+          <Panel title={copy.eventBus} eyebrow={copy.eventBusEye}>
+            <LiveEventStream locale={locale} />
           </Panel>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
-          <Panel title="Exchange announcements" eyebrow={dict.common.latest}>
+          <Panel title={copy.announcements} eyebrow={dict.common.latest}>
             <div className="space-y-3">
               {market.announcements.map((item) => (
                 <a
@@ -76,7 +90,7 @@ export default async function Home({
             </div>
           </Panel>
 
-          <Panel title="Platform lanes" eyebrow="Capabilities">
+          <Panel title={copy.lanes} eyebrow={copy.capabilities}>
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 {dict.home.highlights.map((item) => (
@@ -88,11 +102,11 @@ export default async function Home({
               <div className="grid gap-3 sm:grid-cols-2">
                 <Link href={`/market?lang=${locale}`} className="rounded-[22px] border border-white/10 bg-black/20 p-4 transition hover:border-emerald-300/40">
                   <p className="font-semibold">{dict.home.primaryCta}</p>
-                  <p className="mt-2 text-sm text-zinc-300">Track Binance + OKX tickers, announcements, and external news.</p>
+                  <p className="mt-2 text-sm text-zinc-300">{copy.marketDesc}</p>
                 </Link>
                 <Link href={`/admin?lang=${locale}`} className="rounded-[22px] border border-white/10 bg-black/20 p-4 transition hover:border-amber-300/40">
                   <p className="font-semibold">{dict.home.secondaryCta}</p>
-                  <p className="mt-2 text-sm text-zinc-300">Configure SMTP, AI defaults, GitHub update targets, and system health.</p>
+                  <p className="mt-2 text-sm text-zinc-300">{copy.adminDesc}</p>
                 </Link>
               </div>
             </div>

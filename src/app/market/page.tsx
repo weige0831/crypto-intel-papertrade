@@ -13,12 +13,24 @@ export default async function MarketPage({
 }) {
   const locale = resolveLocale((await searchParams).lang);
   const dict = getDictionary(locale);
-  const market = await getMarketPageData();
+  const market = await getMarketPageData(locale);
+  const isZh = locale === "zh-CN";
+
+  const copy = {
+    subtitle: isZh ? "统一展示 Binance + OKX 行情快照，并叠加公告和 RSS 消息面。" : "Unified Binance + OKX market snapshots with announcement and RSS overlays.",
+    tracked: isZh ? "跟踪行情快照" : "Tracked snapshots",
+    volume24h: isZh ? "24 小时成交额" : "Volume 24h",
+    sse: isZh ? "SSE 监控" : "SSE monitor",
+    runtime: isZh ? "运行时事件流" : "Runtime feed",
+    notices: isZh ? "交易所公告" : "Exchange notices",
+    news: isZh ? "外部新闻" : "External news",
+    newsEye: isZh ? "RSS / API" : "RSS / API",
+  };
 
   return (
-    <AppShell locale={locale} title={dict.sections.liveMarket} subtitle="Unified Binance + OKX market snapshots with announcement and RSS overlays.">
+    <AppShell locale={locale} title={dict.sections.liveMarket} subtitle={copy.subtitle}>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Panel title="Tracked snapshots" eyebrow={dict.common.realtime}>
+        <Panel title={copy.tracked} eyebrow={dict.common.realtime}>
           <div className="grid gap-3 md:grid-cols-2">
             {market.snapshots.map((snapshot) => (
               <div key={`${snapshot.exchange}-${snapshot.instrument}`} className="rounded-[24px] border border-white/10 bg-black/20 p-4">
@@ -32,17 +44,19 @@ export default async function MarketPage({
                   </StatusPill>
                 </div>
                 <p className="mt-3 text-2xl font-semibold">{formatUsd(snapshot.last ?? 0)}</p>
-                <p className="mt-1 text-sm text-zinc-400">Volume 24h: {formatUsd(snapshot.volume24h ?? 0)}</p>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {copy.volume24h}: {formatUsd(snapshot.volume24h ?? 0)}
+                </p>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel title="SSE monitor" eyebrow="Runtime feed">
-          <LiveEventStream />
+        <Panel title={copy.sse} eyebrow={copy.runtime}>
+          <LiveEventStream locale={locale} />
         </Panel>
 
-        <Panel title="Exchange notices" eyebrow={dict.common.latest}>
+        <Panel title={copy.notices} eyebrow={dict.common.latest}>
           <div className="space-y-3">
             {market.announcements.map((item) => (
               <a
@@ -60,7 +74,7 @@ export default async function MarketPage({
           </div>
         </Panel>
 
-        <Panel title="External news" eyebrow="RSS / API">
+        <Panel title={copy.news} eyebrow={copy.newsEye}>
           <div className="space-y-3">
             {market.news.map((item) => (
               <a

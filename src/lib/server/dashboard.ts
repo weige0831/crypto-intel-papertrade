@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { maskSecret } from "@/lib/crypto";
+import { type AppLocale } from "@/lib/constants";
 import { niceDate } from "@/lib/utils";
 
 const sampleSnapshots = [
@@ -49,7 +50,7 @@ async function withFallback<T>(factory: () => Promise<T>, fallback: T) {
   }
 }
 
-export async function getHomeMetrics() {
+export async function getHomeMetrics(locale: AppLocale = "zh-CN") {
   const [marketCount, announcementCount, newsCount, aiCount] = await Promise.all([
     withFallback(() => prisma.marketSnapshot.count(), sampleSnapshots.length),
     withFallback(() => prisma.announcement.count(), 8),
@@ -57,15 +58,20 @@ export async function getHomeMetrics() {
     withFallback(() => prisma.aiDecisionLog.count(), 5),
   ]);
 
+  const labels =
+    locale === "zh-CN"
+      ? ["跟踪市场", "公告数量", "新闻条目", "AI 决策"]
+      : ["Tracked markets", "Announcements", "News items", "AI decisions"];
+
   return [
-    { label: "Tracked markets", value: marketCount.toString() },
-    { label: "Announcements", value: announcementCount.toString() },
-    { label: "News items", value: newsCount.toString() },
-    { label: "AI decisions", value: aiCount.toString() },
+    { label: labels[0], value: marketCount.toString() },
+    { label: labels[1], value: announcementCount.toString() },
+    { label: labels[2], value: newsCount.toString() },
+    { label: labels[3], value: aiCount.toString() },
   ];
 }
 
-export async function getMarketPageData() {
+export async function getMarketPageData(locale: AppLocale = "zh-CN") {
   const snapshots = await withFallback(
     () =>
       prisma.marketSnapshot.findMany({
@@ -82,17 +88,29 @@ export async function getMarketPageData() {
         orderBy: { discoveredAt: "desc" },
       }),
     [
-      {
-        id: "demo-1",
-        exchange: "BINANCE",
-        title: "New listing watch: volatility expected",
-        summary: "Demo data shown until the worker stores live exchange notices.",
-        url: "https://example.com/binance-demo",
-        publishedAt: new Date(),
-        discoveredAt: new Date(),
-        symbols: null,
-        category: "listing",
-      },
+      locale === "zh-CN"
+        ? {
+            id: "demo-1",
+            exchange: "BINANCE",
+            title: "演示公告：待 Worker 接入后显示实时交易所公告",
+            summary: "当前显示的是演示数据，Worker 开始采集后这里会自动切换为真实公告。",
+            url: "https://example.com/binance-demo",
+            publishedAt: new Date(),
+            discoveredAt: new Date(),
+            symbols: null,
+            category: "listing",
+          }
+        : {
+            id: "demo-1",
+            exchange: "BINANCE",
+            title: "New listing watch: volatility expected",
+            summary: "Demo data shown until the worker stores live exchange notices.",
+            url: "https://example.com/binance-demo",
+            publishedAt: new Date(),
+            discoveredAt: new Date(),
+            symbols: null,
+            category: "listing",
+          },
     ],
   );
 
@@ -103,20 +121,35 @@ export async function getMarketPageData() {
         orderBy: { discoveredAt: "desc" },
       }),
     [
-      {
-        id: "news-1",
-        sourceName: "Demo RSS",
-        sourceType: "RSS",
-        title: "Macro risk-on sentiment pushing majors higher",
-        summary: "Connect the worker and Redis to see live aggregated feeds here.",
-        url: "https://example.com/news-demo",
-        language: "en-US",
-        symbols: null,
-        category: "macro",
-        importanceScore: 0.5,
-        discoveredAt: new Date(),
-        publishedAt: new Date(),
-      },
+      locale === "zh-CN"
+        ? {
+            id: "news-1",
+            sourceName: "演示 RSS",
+            sourceType: "RSS",
+            title: "演示新闻：接入 Worker 后这里会显示聚合消息面",
+            summary: "启动 Redis 和 Worker 之后，这里会展示实时抓取并聚合的外部新闻流。",
+            url: "https://example.com/news-demo",
+            language: "zh-CN",
+            symbols: null,
+            category: "macro",
+            importanceScore: 0.5,
+            discoveredAt: new Date(),
+            publishedAt: new Date(),
+          }
+        : {
+            id: "news-1",
+            sourceName: "Demo RSS",
+            sourceType: "RSS",
+            title: "Macro risk-on sentiment pushing majors higher",
+            summary: "Connect the worker and Redis to see live aggregated feeds here.",
+            url: "https://example.com/news-demo",
+            language: "en-US",
+            symbols: null,
+            category: "macro",
+            importanceScore: 0.5,
+            discoveredAt: new Date(),
+            publishedAt: new Date(),
+          },
     ],
   );
 
@@ -208,7 +241,7 @@ export async function getUserWorkspace(userId?: string | null) {
   );
 }
 
-export async function getAdminConsoleData() {
+export async function getAdminConsoleData(locale: AppLocale = "zh-CN") {
   const [config, sources, users, updates] = await Promise.all([
     withFallback(() => prisma.adminConfig.findUnique({ where: { id: "singleton" } }), null),
     withFallback(
@@ -235,8 +268,8 @@ export async function getAdminConsoleData() {
     users,
     updates: updates.map((item) => ({
       ...item,
-      startedLabel: niceDate(item.startedAt),
-      finishedLabel: niceDate(item.finishedAt),
+      startedLabel: niceDate(item.startedAt, locale),
+      finishedLabel: niceDate(item.finishedAt, locale),
     })),
   };
 }

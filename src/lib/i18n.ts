@@ -40,23 +40,23 @@ type Dictionary = {
 const dictionaries: Record<AppLocale, Dictionary> = {
   "zh-CN": {
     brand: "Crypto Intel Papertrade",
-    tagline: "实时情报驱动的虚拟仓平台",
+    tagline: "面向虚拟仓与实时消息面的加密情报平台",
     nav: {
       home: "总览",
-      auth: "注册登录",
+      auth: "注册 / 登录",
       market: "市场情报",
       paperTrading: "虚拟仓",
       aiSettings: "AI 配置",
       alerts: "提醒中心",
-      admin: "管理员",
+      admin: "管理员后台",
     },
     home: {
-      title: "把交易所消息面、实时行情和 AI 自动开仓放进同一套中台。",
+      title: "把交易所公告、实时行情、外部消息面和 AI 虚拟交易控制集中到一个平台。",
       subtitle:
-        "面向 Binance、OKX 和可扩展新闻源的情报平台，支持邮箱注册、现货/永续虚拟仓、AI 自动执行和管理员一键更新。",
-      primaryCta: "进入市场情报台",
-      secondaryCta: "打开管理员面板",
-      highlights: ["Binance + OKX 全市场监听", "现货 / 合约仿真", "OpenAI 兼容 AI 接口", "GitHub + GHCR 一键更新"],
+        "面向 Binance、OKX 和可扩展新闻源的情报系统，支持邮箱验证码注册、现货与永续虚拟仓、AI 自动开仓，以及管理员一键更新。",
+      primaryCta: "进入市场情报",
+      secondaryCta: "进入管理员后台",
+      highlights: ["Binance + OKX 全市场监控", "现货 / 永续虚拟仓", "兼容 OpenAI 风格接口", "GitHub + GHCR 自动更新"],
     },
     sections: {
       liveMarket: "实时市场流",

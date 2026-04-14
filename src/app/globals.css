@@ -7,6 +7,8 @@
 
 :root {
   color-scheme: dark;
+  --font-display: "Space Grotesk", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 }
 
 * {
