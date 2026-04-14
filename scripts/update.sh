@@ -26,6 +26,11 @@ compose() {
   docker_cmd compose "$@"
 }
 
+has_prisma_migrations() {
+  [ -d prisma/migrations ] || return 1
+  find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .
+}
+
 set_env_value() {
   key="$1"
   value="$2"
@@ -36,6 +41,17 @@ set_env_value() {
   else
     printf '\n%s=%s\n' "$key" "$value" >> .env
   fi
+}
+
+apply_database_changes() {
+  if has_prisma_migrations; then
+    echo "Applying Prisma migrations..."
+    compose run --rm web npm run db:migrate
+    return
+  fi
+
+  echo "No Prisma migrations found. Using prisma db push..."
+  compose run --rm web npm run db:push
 }
 
 cd "$APP_DIR"
@@ -75,7 +91,7 @@ if ! compose pull web worker; then
 fi
 
 compose up -d postgres redis
-compose run --rm web npm run db:migrate
+apply_database_changes
 compose up -d --remove-orphans web worker
 
 sleep 12

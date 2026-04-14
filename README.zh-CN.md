@@ -147,8 +147,7 @@ cd crypto-intel-papertrade
 只要给它管理员邮箱和密码就可以：
 
 ```bash
-chmod +x scripts/install.sh scripts/update.sh scripts/quickstart-ubuntu.sh
-ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./scripts/install.sh
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
 ```
 
 当前 `install.sh` 会自动完成：
@@ -161,6 +160,8 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./scripts/
 - 如果 GHCR 镜像拉取失败，会自动回退到本地构建
 - 启动 PostgreSQL 和 Redis
 - 执行 Prisma 数据库步骤
+  如果仓库里已经有 `prisma/migrations`，就执行 `prisma migrate deploy`
+  如果还没有迁移文件，就自动回退到 `prisma db push`
 - 启动 `web` 和 `worker`
 
 ### 第 7 步：安装完成后去后台继续配置
@@ -257,7 +258,7 @@ http://localhost:3000
 
 ```bash
 cd ~/crypto-intel-papertrade
-./scripts/update.sh
+sh scripts/update.sh
 ```
 
 `update.sh` 会自动做这些事情：

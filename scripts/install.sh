@@ -43,6 +43,11 @@ compose() {
   docker_cmd compose "$@"
 }
 
+has_prisma_migrations() {
+  [ -d prisma/migrations ] || return 1
+  find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .
+}
+
 generate_secret() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -191,6 +196,17 @@ ensure_compose_images() {
   fi
 }
 
+prepare_database_schema() {
+  if has_prisma_migrations; then
+    log "Applying Prisma migrations..."
+    compose run --rm web npm run db:migrate
+    return
+  fi
+
+  log "No Prisma migrations found. Using prisma db push for initial schema sync..."
+  compose run --rm web npm run db:push
+}
+
 main() {
   require_cmd git
   require_cmd sed
@@ -206,7 +222,7 @@ main() {
   ensure_compose_images
 
   compose up -d postgres redis
-  compose run --rm web npm run db:migrate
+  prepare_database_schema
   compose run --rm web npm run db:seed
   compose up -d web worker
 

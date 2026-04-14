@@ -135,8 +135,7 @@ cd crypto-intel-papertrade
 This is now enough for a basic install:
 
 ```bash
-chmod +x scripts/install.sh scripts/update.sh scripts/quickstart-ubuntu.sh
-ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./scripts/install.sh
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
 ```
 
 What `install.sh` now does automatically:
@@ -150,6 +149,8 @@ What `install.sh` now does automatically:
 - pulls GHCR images or falls back to local build
 - starts PostgreSQL and Redis
 - runs Prisma database setup
+  If `prisma/migrations` exists, it uses `prisma migrate deploy`.
+  If no migrations exist yet, it automatically falls back to `prisma db push`.
 - starts `web` and `worker`
 
 ### Step 7: Configure the rest later in admin panel
@@ -244,7 +245,7 @@ After new code is pushed to `main`, update the server in one of these ways:
 
 ```bash
 cd ~/crypto-intel-papertrade
-./scripts/update.sh
+sh scripts/update.sh
 ```
 
 `update.sh` will:

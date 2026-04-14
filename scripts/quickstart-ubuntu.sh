@@ -71,7 +71,6 @@ main() {
   clone_or_update_repo
 
   cd "$APP_DIR"
-  chmod +x scripts/install.sh scripts/update.sh scripts/quickstart-ubuntu.sh
 
   if ! docker info >/dev/null 2>&1; then
     log "Docker was installed or docker group permissions changed."
