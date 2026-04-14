@@ -1,42 +1,77 @@
 import WebSocket from "ws";
 
 import { env } from "@/lib/env";
-import { normalizeBinanceSymbol } from "@/lib/market/normalize";
+import { parseBinanceSymbol } from "@/lib/market/normalize";
 import type { MarketSnapshotInput } from "@/lib/sources/types";
 
-type BinanceMiniTicker = {
+type BinanceTicker = {
   s: string;
+  b?: string;
+  a?: string;
   c: string;
   o: string;
+  h?: string;
+  l?: string;
   v: string;
+  q?: string;
   P?: string;
 };
+
+async function fetchBinanceTickers() {
+  const response = await fetch(`${env.BINANCE_API_URL}/api/v3/ticker/24hr`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch Binance 24hr tickers");
+  }
+
+  return (await response.json()) as BinanceTicker[];
+}
+
+function toSnapshot(item: BinanceTicker): MarketSnapshotInput {
+  const parsed = parseBinanceSymbol(item.s);
+  const last = Number(item.c);
+  const open24h = Number(item.o);
+
+  return {
+    exchange: "BINANCE",
+    marketType: parsed.marketType,
+    instrument: parsed.instrument,
+    displaySymbol: parsed.displaySymbol,
+    baseAsset: parsed.baseAsset,
+    quoteAsset: parsed.quoteAsset,
+    bid: item.b ? Number(item.b) : undefined,
+    ask: item.a ? Number(item.a) : undefined,
+    last,
+    volume24h: Number(item.v),
+    quoteVolume24h: item.q ? Number(item.q) : undefined,
+    open24h,
+    high24h: item.h ? Number(item.h) : undefined,
+    low24h: item.l ? Number(item.l) : undefined,
+    priceChangePercent24h: item.P ? Number(item.P) : open24h === 0 ? 0 : ((last - open24h) / open24h) * 100,
+    metadata: {
+      source: "binance-24hr-ticker",
+    },
+  };
+}
 
 export class BinanceConnector {
   private socket?: WebSocket;
 
-  start(onSnapshot: (snapshot: MarketSnapshotInput) => void) {
+  async start(onSnapshot: (snapshot: MarketSnapshotInput) => void) {
+    const initialSnapshots = await fetchBinanceTickers();
+    initialSnapshots.forEach((item) => onSnapshot(toSnapshot(item)));
+
     this.socket = new WebSocket(env.BINANCE_WS_URL);
 
     this.socket.on("message", (payload) => {
       try {
-        const data = JSON.parse(payload.toString()) as BinanceMiniTicker[];
+        const raw = JSON.parse(payload.toString()) as BinanceTicker | BinanceTicker[];
+        const data = Array.isArray(raw) ? raw : [raw];
 
         data.forEach((item) => {
-          const last = Number(item.c);
-          const open = Number(item.o);
-          const priceChangePercent24h = item.P ? Number(item.P) : ((last - open) / open) * 100;
-
-          onSnapshot({
-            exchange: "BINANCE",
-            instrument: normalizeBinanceSymbol(item.s),
-            last,
-            volume24h: Number(item.v),
-            priceChangePercent24h,
-            metadata: {
-              source: "miniTicker",
-            },
-          });
+          onSnapshot(toSnapshot(item));
         });
       } catch {
         return;

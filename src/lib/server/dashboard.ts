@@ -1,42 +1,96 @@
-import { prisma } from "@/lib/prisma";
-import { maskSecret } from "@/lib/crypto";
+import { type MarketSnapshot } from "@prisma/client";
+
 import { type AppLocale } from "@/lib/constants";
+import { maskSecret } from "@/lib/crypto";
+import { buildTradingViewSymbol, canonicalInstrument, splitInstrument } from "@/lib/market/normalize";
+import { prisma } from "@/lib/prisma";
 import { niceDate } from "@/lib/utils";
 
-const sampleSnapshots = [
+type RankingRow = {
+  instrument: string;
+  displaySymbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  exchange: string;
+  marketType: "SPOT" | "PERPETUAL";
+  last: number | null;
+  priceChangePercent24h: number | null;
+  quoteVolume24h: number | null;
+  high24h: number | null;
+  low24h: number | null;
+  availableMarkets: number;
+  exchanges: string[];
+};
+
+type IntelFeedItem = {
+  id: string;
+  kind: "announcement" | "news";
+  sourceLabel: string;
+  title: string;
+  summary: string | null;
+  url: string;
+  publishedAt: Date | null;
+  symbols: string[];
+};
+
+const sampleSnapshots: MarketSnapshot[] = [
   {
-    id: "sample-btc",
+    id: "sample-btc-binance",
     exchange: "BINANCE",
+    marketType: "SPOT",
     instrument: "BTCUSDT",
+    displaySymbol: "BTCUSDT",
+    baseAsset: "BTC",
+    quoteAsset: "USDT",
     bid: 67390,
     ask: 67430,
     last: 67420,
-    priceChangePercent24h: 2.4,
-    volume24h: 329100000,
+    volume24h: 4893,
+    quoteVolume24h: 329100000,
+    open24h: 65800,
+    high24h: 68200,
+    low24h: 65120,
+    priceChangePercent24h: 2.46,
     metadata: {},
     observedAt: new Date(),
   },
   {
-    id: "sample-eth",
+    id: "sample-eth-okx",
     exchange: "OKX",
+    marketType: "SPOT",
     instrument: "ETHUSDT",
+    displaySymbol: "ETH-USDT",
+    baseAsset: "ETH",
+    quoteAsset: "USDT",
     bid: 3283,
     ask: 3285,
     last: 3284,
-    priceChangePercent24h: -1.1,
-    volume24h: 194400000,
+    volume24h: 59120,
+    quoteVolume24h: 194400000,
+    open24h: 3320,
+    high24h: 3366,
+    low24h: 3254,
+    priceChangePercent24h: -1.08,
     metadata: {},
     observedAt: new Date(),
   },
   {
-    id: "sample-sol",
+    id: "sample-sol-binance",
     exchange: "BINANCE",
+    marketType: "SPOT",
     instrument: "SOLUSDT",
+    displaySymbol: "SOLUSDT",
+    baseAsset: "SOL",
+    quoteAsset: "USDT",
     bid: 171.2,
     ask: 171.6,
     last: 171.4,
+    volume24h: 515000,
+    quoteVolume24h: 88300000,
+    open24h: 162,
+    high24h: 174.8,
+    low24h: 160.1,
     priceChangePercent24h: 5.8,
-    volume24h: 88300000,
     metadata: {},
     observedAt: new Date(),
   },
@@ -48,6 +102,121 @@ async function withFallback<T>(factory: () => Promise<T>, fallback: T) {
   } catch {
     return fallback;
   }
+}
+
+function safeArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function snapshotWithDerivedFields(snapshot: MarketSnapshot) {
+  const { base, quote } = splitInstrument(snapshot.instrument);
+
+  return {
+    ...snapshot,
+    displaySymbol: snapshot.displaySymbol ?? snapshot.instrument,
+    baseAsset: snapshot.baseAsset ?? base,
+    quoteAsset: snapshot.quoteAsset ?? quote,
+  };
+}
+
+function buildRankings(snapshots: MarketSnapshot[]) {
+  const grouped = new Map<string, MarketSnapshot[]>();
+
+  snapshots.forEach((snapshot) => {
+    const instrument = canonicalInstrument(snapshot.instrument);
+    grouped.set(instrument, [...(grouped.get(instrument) ?? []), snapshotWithDerivedFields(snapshot)]);
+  });
+
+  const rows: RankingRow[] = [...grouped.values()].map((group) => {
+    const ordered = [...group].sort(
+      (left, right) =>
+        (right.quoteVolume24h ?? 0) - (left.quoteVolume24h ?? 0) ||
+        (right.observedAt?.getTime?.() ?? 0) - (left.observedAt?.getTime?.() ?? 0),
+    );
+    const lead = ordered[0];
+
+    return {
+      instrument: lead.instrument,
+      displaySymbol: lead.displaySymbol ?? lead.instrument,
+      baseAsset: lead.baseAsset ?? splitInstrument(lead.instrument).base,
+      quoteAsset: lead.quoteAsset ?? splitInstrument(lead.instrument).quote,
+      exchange: lead.exchange,
+      marketType: lead.marketType,
+      last: lead.last,
+      priceChangePercent24h: lead.priceChangePercent24h,
+      quoteVolume24h: lead.quoteVolume24h,
+      high24h: lead.high24h,
+      low24h: lead.low24h,
+      availableMarkets: ordered.length,
+      exchanges: [...new Set(ordered.map((item) => `${item.exchange} ${item.marketType}`))],
+    };
+  });
+
+  return {
+    volume: [...rows].sort((left, right) => (right.quoteVolume24h ?? 0) - (left.quoteVolume24h ?? 0)).slice(0, 24),
+    movers: [...rows].sort((left, right) => (right.priceChangePercent24h ?? 0) - (left.priceChangePercent24h ?? 0)).slice(0, 24),
+    losers: [...rows].sort((left, right) => (left.priceChangePercent24h ?? 0) - (right.priceChangePercent24h ?? 0)).slice(0, 24),
+  };
+}
+
+function buildIntelFeed(
+  announcements: Array<{
+    id: string;
+    exchange: string;
+    title: string;
+    summary: string | null;
+    url: string;
+    publishedAt: Date | null;
+    discoveredAt: Date;
+    symbols: unknown;
+  }>,
+  news: Array<{
+    id: string;
+    sourceName: string;
+    title: string;
+    summary: string | null;
+    url: string;
+    publishedAt: Date | null;
+    discoveredAt: Date;
+    symbols: unknown;
+  }>,
+) {
+  return [
+    ...announcements.map((item) => ({
+      id: item.id,
+      kind: "announcement" as const,
+      sourceLabel: item.exchange,
+      title: item.title,
+      summary: item.summary,
+      url: item.url,
+      publishedAt: item.publishedAt ?? item.discoveredAt,
+      symbols: safeArray<string>(item.symbols).map(canonicalInstrument),
+    })),
+    ...news.map((item) => ({
+      id: item.id,
+      kind: "news" as const,
+      sourceLabel: item.sourceName,
+      title: item.title,
+      summary: item.summary,
+      url: item.url,
+      publishedAt: item.publishedAt ?? item.discoveredAt,
+      symbols: safeArray<string>(item.symbols).map(canonicalInstrument),
+    })),
+  ].sort((left, right) => (right.publishedAt?.getTime?.() ?? 0) - (left.publishedAt?.getTime?.() ?? 0));
+}
+
+function filterIntelByInstrument(items: IntelFeedItem[], instrument: string) {
+  const canonical = canonicalInstrument(instrument);
+  const { base } = splitInstrument(canonical);
+
+  return items.filter((item) => {
+    if (item.symbols.includes(canonical)) {
+      return true;
+    }
+
+    const text = `${item.title} ${item.summary ?? ""}`.toUpperCase();
+    return text.includes(canonical) || text.includes(base);
+  });
 }
 
 export async function getHomeMetrics(locale: AppLocale = "zh-CN") {
@@ -75,8 +244,8 @@ export async function getMarketPageData(locale: AppLocale = "zh-CN") {
   const snapshots = await withFallback(
     () =>
       prisma.marketSnapshot.findMany({
-        take: 12,
-        orderBy: [{ observedAt: "desc" }, { volume24h: "desc" }],
+        take: 300,
+        orderBy: [{ quoteVolume24h: "desc" }, { observedAt: "desc" }],
       }),
     sampleSnapshots,
   );
@@ -84,79 +253,84 @@ export async function getMarketPageData(locale: AppLocale = "zh-CN") {
   const announcements = await withFallback(
     () =>
       prisma.announcement.findMany({
-        take: 6,
-        orderBy: { discoveredAt: "desc" },
+        take: 12,
+        orderBy: [{ publishedAt: "desc" }, { discoveredAt: "desc" }],
       }),
     [
-      locale === "zh-CN"
-        ? {
-            id: "demo-1",
-            exchange: "BINANCE",
-            title: "演示公告：待 Worker 接入后显示实时交易所公告",
-            summary: "当前显示的是演示数据，Worker 开始采集后这里会自动切换为真实公告。",
-            url: "https://example.com/binance-demo",
-            publishedAt: new Date(),
-            discoveredAt: new Date(),
-            symbols: null,
-            category: "listing",
-          }
-        : {
-            id: "demo-1",
-            exchange: "BINANCE",
-            title: "New listing watch: volatility expected",
-            summary: "Demo data shown until the worker stores live exchange notices.",
-            url: "https://example.com/binance-demo",
-            publishedAt: new Date(),
-            discoveredAt: new Date(),
-            symbols: null,
-            category: "listing",
-          },
+      {
+        id: "demo-announcement",
+        exchange: "BINANCE",
+        title: locale === "zh-CN" ? "演示公告：Worker 启动后这里会显示交易所官方公告" : "Demo notice: official exchange announcements appear after the worker starts",
+        summary: locale === "zh-CN" ? "当前展示的是占位数据，接入真实采集后会自动切换。" : "Demo data is shown until live collectors are running.",
+        url: "https://example.com/demo-announcement",
+        publishedAt: new Date(),
+        discoveredAt: new Date(),
+        symbols: ["BTCUSDT"],
+        category: "announcement",
+      },
     ],
   );
 
   const news = await withFallback(
     () =>
       prisma.newsItem.findMany({
-        take: 6,
-        orderBy: { discoveredAt: "desc" },
+        take: 12,
+        orderBy: [{ publishedAt: "desc" }, { discoveredAt: "desc" }],
       }),
     [
-      locale === "zh-CN"
-        ? {
-            id: "news-1",
-            sourceName: "演示 RSS",
-            sourceType: "RSS",
-            title: "演示新闻：接入 Worker 后这里会显示聚合消息面",
-            summary: "启动 Redis 和 Worker 之后，这里会展示实时抓取并聚合的外部新闻流。",
-            url: "https://example.com/news-demo",
-            language: "zh-CN",
-            symbols: null,
-            category: "macro",
-            importanceScore: 0.5,
-            discoveredAt: new Date(),
-            publishedAt: new Date(),
-          }
-        : {
-            id: "news-1",
-            sourceName: "Demo RSS",
-            sourceType: "RSS",
-            title: "Macro risk-on sentiment pushing majors higher",
-            summary: "Connect the worker and Redis to see live aggregated feeds here.",
-            url: "https://example.com/news-demo",
-            language: "en-US",
-            symbols: null,
-            category: "macro",
-            importanceScore: 0.5,
-            discoveredAt: new Date(),
-            publishedAt: new Date(),
-          },
+      {
+        id: "demo-news",
+        sourceName: locale === "zh-CN" ? "演示新闻源" : "Demo news feed",
+        sourceType: "RSS",
+        title: locale === "zh-CN" ? "演示新闻：启动 RSS/外部源后这里会显示实时消息面" : "Demo news: live intel appears here after RSS collectors start",
+        summary: locale === "zh-CN" ? "当前是占位内容，用于说明消息面聚合区域。" : "This is placeholder content for the intel feed.",
+        url: "https://example.com/demo-news",
+        language: locale,
+        symbols: ["ETHUSDT"],
+        category: "news",
+        importanceScore: 0.5,
+        discoveredAt: new Date(),
+        publishedAt: new Date(),
+      },
     ],
   );
 
   return {
     snapshots,
+    rankings: buildRankings(snapshots),
     announcements,
     news,
+    intelFeed: buildIntelFeed(announcements, news),
+  };
+}
+
+export async function getInstrumentPageData(instrument: string, locale: AppLocale = "zh-CN") {
+  const canonical = canonicalInstrument(instrument);
+  const pageData = await getMarketPageData(locale);
+  const snapshots = pageData.snapshots
+    .filter((snapshot) => canonicalInstrument(snapshot.instrument) === canonical)
+    .sort((left, right) => (right.quoteVolume24h ?? 0) - (left.quoteVolume24h ?? 0));
+
+  const topSnapshot = snapshots[0] ?? sampleSnapshots[0];
+  const intelFeed = filterIntelByInstrument(pageData.intelFeed, canonical).slice(0, 12);
+  const chartSnapshot =
+    snapshots.find((item) => buildTradingViewSymbol({ exchange: item.exchange, instrument: item.instrument, marketType: item.marketType })) ??
+    snapshots[0] ??
+    topSnapshot;
+
+  return {
+    instrument: canonical,
+    displayName: topSnapshot.displaySymbol ?? canonical,
+    chartSymbol: buildTradingViewSymbol({
+      exchange: chartSnapshot.exchange,
+      instrument: chartSnapshot.instrument,
+      marketType: chartSnapshot.marketType,
+    }),
+    topSnapshot,
+    snapshots,
+    intelFeed,
+    relatedAnnouncements: intelFeed.filter((item) => item.kind === "announcement"),
+    relatedNews: intelFeed.filter((item) => item.kind === "news"),
   };
 }
 

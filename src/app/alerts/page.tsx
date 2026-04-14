@@ -1,6 +1,6 @@
 import { AppShell, Panel } from "@/components/chrome";
 import { LiveEventStream } from "@/components/interactive";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { resolveLocale } from "@/lib/i18n";
 import { getMarketPageData } from "@/lib/server/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -11,46 +11,57 @@ export default async function AlertsPage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const locale = resolveLocale((await searchParams).lang);
-  const dict = getDictionary(locale);
   const market = await getMarketPageData(locale);
   const isZh = locale === "zh-CN";
 
-  const copy = {
-    subtitle: isZh ? "将市场异动、交易所公告和外部新闻统一归集到一个提醒队列。" : "A single queue for market alerts, exchange notices, and external news.",
-    realtimeAlerts: isZh ? "实时提醒" : "Realtime alerts",
-    exchangeAnnouncements: isZh ? "交易所公告" : "Exchange announcements",
-    newsFeed: isZh ? "新闻流" : "News feed",
-    intel: isZh ? "情报聚合" : "Intel",
-  };
-
   return (
-    <AppShell locale={locale} title={dict.nav.alerts} subtitle={copy.subtitle}>
+    <AppShell
+      locale={locale}
+      title={isZh ? "消息中心" : "Intel feed"}
+      subtitle={
+        isZh
+          ? "默认只看公告、新闻、AI 信号和市场预警，不再被海量 market tick 淹没。"
+          : "By default this page focuses on announcements, news, AI signals, and market alerts instead of raw market ticks."
+      }
+    >
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel title={copy.realtimeAlerts} eyebrow="SSE">
-          <LiveEventStream locale={locale} />
+        <Panel title={isZh ? "实时消息面" : "Realtime intel"} eyebrow="mode=intel">
+          <LiveEventStream locale={locale} mode="intel" />
         </Panel>
 
         <div className="grid gap-6">
-          <Panel title={copy.exchangeAnnouncements} eyebrow={dict.common.latest}>
+          <Panel title={isZh ? "交易所公告" : "Exchange announcements"} eyebrow={isZh ? "官方来源" : "Official sources"}>
             <div className="space-y-3">
               {market.announcements.map((item) => (
-                <div key={item.url} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                  <p className="text-xs uppercase tracking-[0.25em] text-zinc-400">{item.exchange}</p>
-                  <p className="mt-2 font-semibold">{item.title}</p>
-                  <p className="mt-2 text-sm text-zinc-300">{item.summary}</p>
-                </div>
+                <a
+                  key={item.url}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-[24px] border border-white/10 bg-slate-950/45 p-4 transition hover:border-cyan-300/40"
+                >
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{item.exchange}</p>
+                  <p className="mt-2 font-semibold text-white">{item.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{item.summary}</p>
+                </a>
               ))}
             </div>
           </Panel>
 
-          <Panel title={copy.newsFeed} eyebrow={copy.intel}>
+          <Panel title={isZh ? "外部新闻与 RSS" : "External news and RSS"} eyebrow={isZh ? "扩展消息源" : "Extended feeds"}>
             <div className="space-y-3">
               {market.news.map((item) => (
-                <div key={item.url} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                  <p className="text-xs uppercase tracking-[0.25em] text-zinc-400">{item.sourceName}</p>
-                  <p className="mt-2 font-semibold">{item.title}</p>
-                  <p className="mt-2 text-sm text-zinc-300">{item.summary}</p>
-                </div>
+                <a
+                  key={item.url}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-[24px] border border-white/10 bg-slate-950/45 p-4 transition hover:border-amber-300/40"
+                >
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{item.sourceName}</p>
+                  <p className="mt-2 font-semibold text-white">{item.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{item.summary}</p>
+                </a>
               ))}
             </div>
           </Panel>

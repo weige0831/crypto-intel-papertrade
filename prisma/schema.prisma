@@ -304,16 +304,24 @@ model Announcement {
 model MarketSnapshot {
   id                    String   @id @default(cuid())
   exchange              String
+  marketType            MarketType @default(SPOT)
   instrument            String
+  displaySymbol         String?
+  baseAsset             String?
+  quoteAsset            String?
   bid                   Float?
   ask                   Float?
   last                  Float?
   volume24h             Float?
+  quoteVolume24h        Float?
+  open24h               Float?
+  high24h               Float?
+  low24h                Float?
   priceChangePercent24h Float?
   metadata              Json?
   observedAt            DateTime @default(now())
 
-  @@unique([exchange, instrument])
+  @@unique([exchange, marketType, instrument])
 }
 
 model AiDecisionLog {

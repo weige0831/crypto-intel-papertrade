@@ -5,6 +5,7 @@ import { RUNTIME_EVENT_TYPES } from "@/lib/constants";
 export const emailCodeRequestSchema = z.object({
   email: z.string().email(),
   purpose: z.enum(["REGISTER", "LOGIN", "RESET_PASSWORD"]).default("REGISTER"),
+  locale: z.enum(["zh-CN", "en-US"]).default("zh-CN"),
 });
 
 export const registerSchema = z.object({
@@ -19,6 +20,18 @@ export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
+
+export const resetPasswordSchema = z
+  .object({
+    email: z.string().email(),
+    code: z.string().min(4).max(8),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export const aiSettingsSchema = z.object({
   baseUrl: z.string().url(),

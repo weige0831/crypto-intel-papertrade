@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       data: {
         email: body.email,
         passwordHash,
-        displayName: body.displayName,
+        displayName: body.displayName || undefined,
         preferredLocale: body.locale,
         emailVerifiedAt: new Date(),
         portfolios: {

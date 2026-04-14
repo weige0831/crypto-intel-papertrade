@@ -263,6 +263,7 @@ main() {
   compose up -d postgres redis
   prepare_database_schema
   compose run --rm web npm run db:seed
+  compose run --rm web npm run admin:reset
   compose up -d web worker
 
   log "Install finished."

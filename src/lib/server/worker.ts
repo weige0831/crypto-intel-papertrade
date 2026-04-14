@@ -16,8 +16,9 @@ import type { IntelItem, MarketSnapshotInput } from "@/lib/sources/types";
 async function persistSnapshot(snapshot: MarketSnapshotInput) {
   const previous = await prisma.marketSnapshot.findUnique({
     where: {
-      exchange_instrument: {
+      exchange_marketType_instrument: {
         exchange: snapshot.exchange,
+        marketType: snapshot.marketType,
         instrument: canonicalInstrument(snapshot.instrument),
       },
     },
@@ -25,27 +26,43 @@ async function persistSnapshot(snapshot: MarketSnapshotInput) {
 
   await prisma.marketSnapshot.upsert({
     where: {
-      exchange_instrument: {
+      exchange_marketType_instrument: {
         exchange: snapshot.exchange,
+        marketType: snapshot.marketType,
         instrument: canonicalInstrument(snapshot.instrument),
       },
     },
     update: {
+      displaySymbol: snapshot.displaySymbol,
+      baseAsset: snapshot.baseAsset,
+      quoteAsset: snapshot.quoteAsset,
       bid: snapshot.bid,
       ask: snapshot.ask,
       last: snapshot.last,
       volume24h: snapshot.volume24h,
+      quoteVolume24h: snapshot.quoteVolume24h,
+      open24h: snapshot.open24h,
+      high24h: snapshot.high24h,
+      low24h: snapshot.low24h,
       priceChangePercent24h: snapshot.priceChangePercent24h,
       metadata: snapshot.metadata as Prisma.InputJsonValue,
       observedAt: new Date(),
     },
     create: {
       exchange: snapshot.exchange,
+      marketType: snapshot.marketType,
       instrument: canonicalInstrument(snapshot.instrument),
+      displaySymbol: snapshot.displaySymbol,
+      baseAsset: snapshot.baseAsset,
+      quoteAsset: snapshot.quoteAsset,
       bid: snapshot.bid,
       ask: snapshot.ask,
       last: snapshot.last,
       volume24h: snapshot.volume24h,
+      quoteVolume24h: snapshot.quoteVolume24h,
+      open24h: snapshot.open24h,
+      high24h: snapshot.high24h,
+      low24h: snapshot.low24h,
       priceChangePercent24h: snapshot.priceChangePercent24h,
       metadata: snapshot.metadata as Prisma.InputJsonValue,
     },
@@ -56,11 +73,19 @@ async function persistSnapshot(snapshot: MarketSnapshotInput) {
       type: "market_tick",
       payload: {
         exchange: snapshot.exchange,
+        marketType: snapshot.marketType,
         instrument: canonicalInstrument(snapshot.instrument),
+        displaySymbol: snapshot.displaySymbol,
+        baseAsset: snapshot.baseAsset,
+        quoteAsset: snapshot.quoteAsset,
         last: snapshot.last,
         bid: snapshot.bid,
         ask: snapshot.ask,
         volume24h: snapshot.volume24h,
+        quoteVolume24h: snapshot.quoteVolume24h,
+        open24h: snapshot.open24h,
+        high24h: snapshot.high24h,
+        low24h: snapshot.low24h,
         priceChangePercent24h: snapshot.priceChangePercent24h,
       },
       createdAt: new Date().toISOString(),
@@ -193,7 +218,7 @@ async function runAiCycle() {
       const [marketContext, newsContext] = await Promise.all([
         prisma.marketSnapshot.findMany({
           take: 12,
-          orderBy: { volume24h: "desc" },
+          orderBy: { quoteVolume24h: "desc" },
         }),
         prisma.newsItem.findMany({
           take: 12,

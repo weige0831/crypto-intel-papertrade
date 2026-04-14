@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "admin:reset": "tsx prisma/reset-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

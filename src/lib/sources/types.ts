@@ -1,10 +1,18 @@
 export type MarketSnapshotInput = {
   exchange: string;
+  marketType: "SPOT" | "PERPETUAL";
   instrument: string;
+  displaySymbol: string;
+  baseAsset: string;
+  quoteAsset: string;
   bid?: number;
   ask?: number;
   last?: number;
   volume24h?: number;
+  quoteVolume24h?: number;
+  open24h?: number;
+  high24h?: number;
+  low24h?: number;
   priceChangePercent24h?: number;
   metadata?: Record<string, unknown>;
 };

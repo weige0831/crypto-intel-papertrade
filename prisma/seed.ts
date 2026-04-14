@@ -1,48 +1,9 @@
-import { PrismaClient, UserRole, VerificationPurpose } from "@prisma/client";
+import { PrismaClient, VerificationPurpose } from "@prisma/client";
 
-import { encryptSecret, hashPassword } from "@/lib/crypto";
+import { encryptSecret } from "@/lib/crypto";
 import { env } from "@/lib/env";
 
 const prisma = new PrismaClient();
-
-async function seedAdmin() {
-  if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD) {
-    return;
-  }
-
-  const passwordHash = await hashPassword(env.ADMIN_PASSWORD);
-
-  const admin = await prisma.user.upsert({
-    where: { email: env.ADMIN_EMAIL },
-    update: {
-      passwordHash,
-      role: UserRole.ADMIN,
-      emailVerifiedAt: new Date(),
-      preferredLocale: env.DEFAULT_LOCALE,
-      isActive: true,
-    },
-    create: {
-      email: env.ADMIN_EMAIL,
-      passwordHash,
-      role: UserRole.ADMIN,
-      emailVerifiedAt: new Date(),
-      preferredLocale: env.DEFAULT_LOCALE,
-      displayName: "Super Admin",
-    },
-  });
-
-  await prisma.portfolio.upsert({
-    where: { id: `${admin.id}-primary` },
-    update: {},
-    create: {
-      id: `${admin.id}-primary`,
-      userId: admin.id,
-      name: "Primary Paper Account",
-      isPrimary: true,
-      totalEquityUsd: 10000,
-    },
-  });
-}
 
 async function main() {
   await prisma.adminConfig.upsert({
@@ -121,9 +82,6 @@ async function main() {
       })
       .catch(() => null);
   }
-
-  await seedAdmin();
-
   await prisma.emailVerificationCode.deleteMany({
     where: {
       purpose: VerificationPurpose.LOGIN,

@@ -11,6 +11,40 @@ export async function POST(request: Request) {
     const body = emailCodeRequestSchema.parse(await request.json());
     const code = `${randomInt(100000, 999999)}`;
 
+    if (body.purpose === "REGISTER") {
+      const existing = await prisma.user.findUnique({
+        where: { email: body.email },
+        select: { id: true },
+      });
+
+      if (existing) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: body.locale === "zh-CN" ? "该邮箱已注册" : "This email is already registered",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (body.purpose === "RESET_PASSWORD") {
+      const existing = await prisma.user.findUnique({
+        where: { email: body.email },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "Account not found",
+          },
+          { status: 404 },
+        );
+      }
+    }
+
     await prisma.emailVerificationCode.create({
       data: {
         email: body.email,
@@ -23,7 +57,8 @@ export async function POST(request: Request) {
     const result = await sendVerificationEmail({
       email: body.email,
       code,
-      locale: "zh-CN",
+      locale: body.locale,
+      purpose: body.purpose,
     });
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 import { AppShell, Panel, StatCard, StatusPill } from "@/components/chrome";
 import { ManualOrderForm } from "@/components/interactive";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { resolveLocale } from "@/lib/i18n";
 import { requireUserPageSession } from "@/lib/page-auth";
 import { getUserWorkspace } from "@/lib/server/dashboard";
 import { formatUsd } from "@/lib/utils";
@@ -13,59 +13,42 @@ export default async function PaperTradingPage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const locale = resolveLocale((await searchParams).lang);
-  const dict = getDictionary(locale);
   const session = await requireUserPageSession(locale, "/paper-trading");
   const workspace = await getUserWorkspace(session.sub);
   const isZh = locale === "zh-CN";
 
-  const copy = {
-    subtitle: isZh ? "支持现货与永续虚拟仓下单、成交、持仓、杠杆和强平跟踪。" : "Spot and perpetual paper execution with fills, positions, leverage, and liquidation tracking.",
-    portfolio: isZh ? "账户" : "Portfolio",
-    equity: isZh ? "总权益" : "Equity",
-    mode: isZh ? "模式" : "Mode",
-    demo: isZh ? "演示" : "Demo",
-    liveDb: isZh ? "数据库模式" : "Live DB",
-    orderPanel: isZh ? "手动虚拟仓下单" : "Manual paper order",
-    desk: isZh ? "执行台" : "Execution desk",
-    wallet: isZh ? "钱包余额" : "Wallet balances",
-    walletEye: isZh ? "资金账户" : "Portfolio",
-    noBalances: isZh ? "暂无余额数据。" : "No balances yet.",
-    positions: isZh ? "当前持仓" : "Open positions",
-    risk: isZh ? "风险" : "Risk",
-    noPositions: isZh ? "当前没有持仓。" : "No open positions.",
-    recentOrders: isZh ? "最近订单" : "Recent orders",
-    audit: isZh ? "审计记录" : "Audit trail",
-    noOrders: isZh ? "还没有订单记录。" : "No orders yet.",
-    qty: isZh ? "数量" : "Qty",
-    entry: isZh ? "开仓价" : "Entry",
-    mark: isZh ? "标记价" : "Mark",
-    liq: isZh ? "强平价" : "Liq",
-  };
-
   return (
-    <AppShell locale={locale} title={dict.sections.paperEngine} subtitle={copy.subtitle}>
+    <AppShell
+      locale={locale}
+      title={isZh ? "虚拟仓执行台" : "Paper trading desk"}
+      subtitle={
+        isZh
+          ? "这里的下单、持仓、止盈止损和杠杆都只作用于虚拟仓。AI 自动开仓也只会写入这一套模拟账户。"
+          : "Orders, positions, stops, and leverage here affect only the paper account. AI execution is restricted to this simulated portfolio."
+      }
+    >
       <div className="grid gap-6">
         <section className="grid gap-4 lg:grid-cols-3">
-          <StatCard label={copy.portfolio} value={workspace.portfolio?.name ?? session.email} />
-          <StatCard label={copy.equity} value={formatUsd(workspace.portfolio?.totalEquityUsd ?? 10000)} tone="amber" />
-          <StatCard label={copy.mode} value={workspace.demoMode ? copy.demo : copy.liveDb} tone="cyan" />
+          <StatCard label={isZh ? "账户" : "Portfolio"} value={workspace.portfolio?.name ?? session.email} />
+          <StatCard label={isZh ? "总权益" : "Equity"} value={formatUsd(workspace.portfolio?.totalEquityUsd ?? 10000)} tone="amber" />
+          <StatCard label={isZh ? "数据模式" : "Data mode"} value={workspace.demoMode ? (isZh ? "演示数据" : "Demo data") : (isZh ? "数据库实时" : "Live database")} tone="cyan" />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <Panel title={copy.orderPanel} eyebrow={copy.desk}>
+        <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+          <Panel title={isZh ? "手动下单" : "Manual order"} eyebrow={isZh ? "执行表单" : "Execution form"}>
             <ManualOrderForm locale={locale} portfolioId={workspace.portfolio?.id ?? "primary"} />
           </Panel>
 
-          <Panel title={copy.wallet} eyebrow={copy.walletEye}>
+          <Panel title={isZh ? "钱包余额" : "Wallet balances"} eyebrow={isZh ? "资产视图" : "Portfolio assets"}>
             <div className="grid gap-3 md:grid-cols-2">
               {workspace.balances.length === 0 ? (
-                <p className="text-sm text-zinc-300">{copy.noBalances}</p>
+                <p className="text-sm text-slate-300">{isZh ? "当前还没有余额数据。" : "No balances yet."}</p>
               ) : (
                 workspace.balances.map((balance) => (
-                  <div key={`${balance.asset}-${balance.marketType}`} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                    <p className="font-semibold">{balance.asset}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.25em] text-zinc-400">{balance.marketType}</p>
-                    <p className="mt-3 text-2xl font-semibold">{balance.available.toFixed(4)}</p>
+                  <div key={`${balance.asset}-${balance.marketType}`} className="rounded-[24px] border border-white/10 bg-slate-950/45 p-4">
+                    <p className="font-semibold text-white">{balance.asset}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-400">{balance.marketType}</p>
+                    <p className="mt-3 text-2xl font-semibold text-white">{balance.available.toFixed(4)}</p>
                   </div>
                 ))
               )}
@@ -74,43 +57,48 @@ export default async function PaperTradingPage({
         </section>
 
         <section className="grid gap-6 lg:grid-cols-2">
-          <Panel title={copy.positions} eyebrow={copy.risk}>
+          <Panel title={isZh ? "当前持仓" : "Open positions"} eyebrow={isZh ? "风险暴露" : "Risk exposure"}>
             <div className="space-y-3">
               {workspace.positions.length === 0 ? (
-                <p className="text-sm text-zinc-300">{copy.noPositions}</p>
+                <p className="text-sm text-slate-300">{isZh ? "当前没有持仓。" : "No open positions."}</p>
               ) : (
                 workspace.positions.map((position) => (
-                  <div key={position.id} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                  <div key={position.id} className="rounded-[24px] border border-white/10 bg-slate-950/45 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{position.instrument}</p>
+                      <p className="font-semibold text-white">{position.instrument}</p>
                       <StatusPill tone={position.side === "BUY" ? "success" : "warn"}>{position.side}</StatusPill>
                       <StatusPill>{position.marketType}</StatusPill>
                     </div>
-                    <p className="mt-3 text-sm text-zinc-300">
-                      {copy.qty} {position.quantity.toFixed(4)} | {copy.entry} {formatUsd(position.entryPrice)} | {copy.mark} {formatUsd(position.markPrice)}
-                    </p>
-                    <p className="mt-1 text-sm text-zinc-400">
-                      {copy.liq} {formatUsd(position.liquidationPrice ?? 0)}
-                    </p>
+                    <div className="mt-3 grid gap-2 text-sm text-slate-300">
+                      <p>
+                        {isZh ? "数量" : "Quantity"} {position.quantity.toFixed(4)}
+                      </p>
+                      <p>
+                        {isZh ? "开仓价 / 标记价" : "Entry / mark"} {formatUsd(position.entryPrice)} / {formatUsd(position.markPrice)}
+                      </p>
+                      <p>
+                        {isZh ? "强平价" : "Liquidation"} {formatUsd(position.liquidationPrice ?? 0)}
+                      </p>
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </Panel>
 
-          <Panel title={copy.recentOrders} eyebrow={copy.audit}>
+          <Panel title={isZh ? "最近订单" : "Recent orders"} eyebrow={isZh ? "执行记录" : "Execution log"}>
             <div className="space-y-3">
               {workspace.orders.length === 0 ? (
-                <p className="text-sm text-zinc-300">{copy.noOrders}</p>
+                <p className="text-sm text-slate-300">{isZh ? "还没有订单记录。" : "No orders yet."}</p>
               ) : (
                 workspace.orders.map((order) => (
-                  <div key={order.id} className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                  <div key={order.id} className="rounded-[24px] border border-white/10 bg-slate-950/45 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{order.instrument}</p>
+                      <p className="font-semibold text-white">{order.instrument}</p>
                       <StatusPill>{order.orderType}</StatusPill>
                       <StatusPill tone={order.status === "FILLED" ? "success" : "warn"}>{order.status}</StatusPill>
                     </div>
-                    <p className="mt-3 text-sm text-zinc-300">
+                    <p className="mt-3 text-sm text-slate-300">
                       {order.side} {order.quantity} @ {formatUsd(order.averageFillPrice ?? order.limitPrice ?? 0)}
                     </p>
                   </div>

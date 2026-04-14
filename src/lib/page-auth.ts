@@ -20,7 +20,7 @@ export function buildAuthHref(locale: AppLocale, nextPath: string, mode: AuthMod
     params.set("mode", "admin");
   }
 
-  return `/auth?${params.toString()}`;
+  return `/auth/login?${params.toString()}`;
 }
 
 export async function requireUserPageSession(locale: AppLocale, pathname: string) {

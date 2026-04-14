@@ -2,40 +2,37 @@
 
 [中文说明](./README.zh-CN.md)
 
-Crypto Intel Papertrade is a full-stack crypto intelligence and paper trading platform built with `Next.js + TypeScript`.
+Crypto Intel Papertrade is a `Next.js + TypeScript` platform for:
 
-It is designed for two groups:
+- official Binance and OKX market ingestion
+- exchange announcement and RSS/news aggregation
+- email-code onboarding
+- spot and perpetual paper trading
+- user-level AI execution settings
+- an admin console with script-based updates
 
-- operators who just want to deploy it on a Linux server
-- developers who want to run it locally and extend it
+## What changed in the current build
 
-## What it does
+- public auth is split into:
+  - `/auth/login`
+  - `/auth/register`
+  - `/auth/forgot-password`
+- `/auth` now redirects to `/auth/login`
+- the public header only exposes `Sign in` and `Register`
+- the admin entry is hidden from public navigation and must be opened manually at `/admin`
+- the homepage and alerts page are now intel-first, instead of dumping raw `market_tick` events
+- a server command exists to force-reset the admin account
 
-- listens to Binance and OKX market data
-- aggregates exchange notices and RSS/news feeds
-- supports email verification registration and password login
-- supports spot and perpetual paper trading
-- lets each user configure an OpenAI-compatible `baseUrl + apiKey + model`
-- provides an admin panel for SMTP, AI defaults, source settings, and system updates
-- ships with install and update scripts for Linux deployment
+## Runtime services
 
-## Services
-
-- `web`: frontend, user pages, admin pages, and API routes
-- `worker`: market ingestion, news collection, AI execution, funding, and liquidation loops
+- `web`: frontend, admin pages, API routes, SSE
+- `worker`: market ingestion, intel collection, AI execution, simulation loops
 - `postgres`: application database
-- `redis`: realtime event bus for SSE and worker communication
+- `redis`: event bus and realtime fan-out
 
-## UI behavior
+## Fast Ubuntu deployment
 
-- normal users should use the top-right `Sign in / Register` entry
-- registration and login live on the dedicated `/auth` page
-- the admin console is intentionally hidden from public navigation
-- administrators reach it manually through `/admin`, which redirects to the admin sign-in flow when needed
-
-## Fastest Ubuntu start
-
-On a fresh Ubuntu server:
+On a clean Ubuntu server:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weige0831/crypto-intel-papertrade/main/scripts/quickstart-ubuntu.sh -o quickstart-ubuntu.sh
@@ -43,7 +40,7 @@ chmod +x quickstart-ubuntu.sh
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quickstart-ubuntu.sh
 ```
 
-The quickstart script installs missing system dependencies, clones the repo, creates `.env`, generates secrets, and prepares the app.
+The quickstart script installs missing dependencies, clones the repo, creates `.env`, generates secrets, seeds the database, resets the admin account, and starts the stack.
 
 Default install directory:
 
@@ -51,21 +48,9 @@ Default install directory:
 $HOME/crypto-intel-papertrade
 ```
 
-After installation, open:
+## Manual Ubuntu deployment
 
-```text
-http://your-server-ip:3000
-```
-
-## Full Ubuntu deployment
-
-### Step 1: Connect to the server
-
-```bash
-ssh your-user@your-server-ip
-```
-
-### Step 2: Install Git
+### 1. Install Git
 
 ```bash
 sudo apt update
@@ -73,7 +58,7 @@ sudo apt install -y git
 git --version
 ```
 
-### Step 3: Install Docker Engine and Docker Compose plugin
+### 2. Install Docker Engine and Docker Compose plugin
 
 ```bash
 sudo apt update
@@ -94,21 +79,17 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo systemctl enable --now docker
 sudo docker version
 sudo docker compose version
-sudo docker run hello-world
 ```
 
-### Step 4: Optional, allow Docker without sudo
+Optional, allow the current user to run Docker without `sudo`:
 
 ```bash
 getent group docker || sudo groupadd docker
 sudo usermod -aG docker $USER
 newgrp docker
-docker run hello-world
 ```
 
-If `newgrp docker` does not take effect, log out and SSH back in.
-
-### Step 5: Clone the project
+### 3. Clone the project
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
@@ -116,7 +97,7 @@ cd crypto-intel-papertrade
 git config core.fileMode false
 ```
 
-### Step 6: Run the install script
+### 4. Run install
 
 ```bash
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
@@ -124,51 +105,58 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts
 
 `install.sh` will:
 
-- create `.env` if needed
+- create `.env` from `.env.example` when missing
 - generate `AUTH_SECRET`
 - generate `APP_ENCRYPTION_KEY`
-- fill GitHub and GHCR defaults
+- set GitHub/GHCR defaults
 - start PostgreSQL and Redis
-- retry GHCR pulls before falling back to local Docker builds
-- keep the embedded PostgreSQL password aligned with `DATABASE_URL`
-- use `prisma migrate deploy` when migrations exist
-- automatically fall back to `prisma db push` when migrations do not exist yet
-- seed the admin account and start `web` and `worker`
+- retry GHCR pulls before falling back to local builds
+- run `prisma migrate deploy` when migrations exist
+- fall back to `prisma db push` when they do not
+- seed system defaults
+- force-create or reset the admin account with `npm run admin:reset`
+- start `web` and `worker`
 
-### Step 7: Configure the rest in the admin panel
+## Updating the server
 
-After first install, log in with the admin account you created and configure:
+```bash
+cd ~/crypto-intel-papertrade
+sh scripts/update.sh
+```
 
-- SMTP settings
-- AI provider defaults
-- source settings
-- maintenance mode
-- GitHub and GHCR update settings
+`update.sh` now:
+
+- pulls the latest `main`
+- updates `IMAGE_TAG`
+- retries GHCR pulls before local build fallback
+- syncs the embedded PostgreSQL password from `.env`
+- runs Prisma migrations or `db push`
+- restarts the stack
+- checks `/api/health`
+- rolls back on failure
+
+## Resetting the admin account
+
+Use this on the server when the admin email or password needs to be recovered:
+
+```bash
+cd ~/crypto-intel-papertrade
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/reset-admin.sh
+```
+
+This command updates `.env`, ensures the user is `ADMIN`, marks the email as verified, and ensures a primary paper portfolio exists.
 
 ## Local development
 
-### Requirements
-
-- `Node.js 22`
-- `npm`
-- `Docker`
-- `Docker Compose`
-- `Git`
-
-### Step 1: Clone the repo
+### 1. Clone and prepare `.env`
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
-```
-
-### Step 2: Create `.env`
-
-```bash
 cp .env.example .env
 ```
 
-Minimum useful local values:
+Minimum useful values:
 
 ```env
 AUTH_SECRET=local-dev-secret
@@ -177,73 +165,46 @@ ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=admin123456
 ```
 
-### Step 3: Start PostgreSQL and Redis
+### 2. Start infra
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-### Step 4: Install dependencies
+### 3. Install and bootstrap
 
 ```bash
 npm install
-```
-
-### Step 5: Prepare the database
-
-```bash
 npm run db:generate
 npm run db:push
 npm run db:seed
+npm run admin:reset
 ```
 
-### Step 6: Start the web app
+### 4. Start app
 
 ```bash
 npm run dev
 ```
 
-### Step 7: Start the worker in another terminal
+In another terminal:
 
 ```bash
 npm run worker
 ```
 
-### Step 8: Open the site
-
-```text
-http://localhost:3000
-```
-
-## Updating the server
-
-After new code is pushed to `main`, update the server with:
-
-```bash
-cd ~/crypto-intel-papertrade
-sh scripts/update.sh
-```
-
-`update.sh` now does the following:
-
-- pulls the latest `main`
-- sets `IMAGE_TAG` to the latest commit SHA
-- retries GHCR image pulls before falling back to a local Docker build
-- keeps the embedded PostgreSQL password aligned with `.env`
-- runs Prisma migrations or `db push`
-- restarts services
-- performs a health check
-- rolls back to the previous image tag if the update fails
-
 ## Main routes
 
-- `/`: overview dashboard
-- `/auth`: dedicated registration and login page
-- `/market`: market intelligence
-- `/paper-trading`: paper trading workspace
-- `/ai-settings`: user AI settings
-- `/alerts`: alerts and feed stream
-- `/admin`: hidden admin console entry
+- `/`
+- `/market`
+- `/market/[instrument]`
+- `/alerts`
+- `/paper-trading`
+- `/ai-settings`
+- `/auth/login`
+- `/auth/register`
+- `/auth/forgot-password`
+- `/admin`
 
 ## Common commands
 
@@ -257,47 +218,15 @@ npm run db:generate
 npm run db:push
 npm run db:migrate
 npm run db:seed
-docker compose up -d postgres redis
-docker compose down
+npm run admin:reset
 sh scripts/install.sh
 sh scripts/update.sh
+sh scripts/reset-admin.sh
 ```
-
-## Troubleshooting
-
-### `docker: command not found`
-
-Docker is not installed correctly, or your shell session needs to be reopened.
-
-### `permission denied while trying to connect to the Docker daemon socket`
-
-Run:
-
-```bash
-getent group docker || sudo groupadd docker
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-### `port 3000 is already in use`
-
-Check what is using it:
-
-```bash
-sudo ss -ltnp | grep 3000
-```
-
-### Email codes are not arriving
-
-If `SMTP_*` is empty, development mode falls back to preview mode and logs the code instead of sending a real email.
-
-## Important notes
-
-- never commit real secrets to GitHub
-- keep real secrets only in `.env` and encrypted admin-side storage
-- the worker already has the main loops wired, but production hardening is still needed for retries, batching, rate limits, and exchange-specific edge cases
 
 ## References
 
+- [Binance Spot REST market data](https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints)
+- [Binance WebSocket streams](https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams)
+- [OKX API v5 docs](https://my.okx.com/docs-v5/en/)
 - [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)

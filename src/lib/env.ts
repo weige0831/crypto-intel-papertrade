@@ -13,7 +13,7 @@ const envSchema = z.object({
   APP_ENCRYPTION_KEY: z.string().default("crypto-intel-papertrade-encryption-key"),
   ADMIN_EMAIL: z.string().email().optional().or(z.literal("")),
   ADMIN_PASSWORD: z.string().optional().or(z.literal("")),
-  BINANCE_WS_URL: z.string().default("wss://stream.binance.com:9443/ws/!miniTicker@arr"),
+  BINANCE_WS_URL: z.string().default("wss://stream.binance.com:9443/ws/!ticker@arr"),
   BINANCE_API_URL: z.string().default("https://api.binance.com"),
   OKX_WS_URL: z.string().default("wss://ws.okx.com:8443/ws/v5/public"),
   OKX_API_URL: z.string().default("https://www.okx.com"),

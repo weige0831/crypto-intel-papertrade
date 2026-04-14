@@ -35,17 +35,41 @@ async function getPrimaryPortfolio(userId: string) {
   });
 }
 
-async function getMarkPrice(exchange: string, instrument: string) {
-  const snapshot = await prisma.marketSnapshot.findUnique({
+async function getMarkPrice(exchange: string, instrument: string, marketType: "SPOT" | "PERPETUAL") {
+  const normalized = canonicalInstrument(instrument);
+
+  const snapshot =
+    exchange === "SIMULATED"
+      ? await prisma.marketSnapshot.findFirst({
+          where: {
+            instrument: normalized,
+            marketType,
+          },
+          orderBy: [{ quoteVolume24h: "desc" }, { observedAt: "desc" }],
+        })
+      : await prisma.marketSnapshot.findUnique({
+          where: {
+            exchange_marketType_instrument: {
+              exchange,
+              marketType,
+              instrument: normalized,
+            },
+          },
+        });
+
+  if (snapshot) {
+    return snapshot.last ?? snapshot.bid ?? snapshot.ask ?? 1;
+  }
+
+  const fallback = await prisma.marketSnapshot.findFirst({
     where: {
-      exchange_instrument: {
-        exchange,
-        instrument: canonicalInstrument(instrument),
-      },
+      instrument: normalized,
+      marketType,
     },
+    orderBy: [{ quoteVolume24h: "desc" }, { observedAt: "desc" }],
   });
 
-  return snapshot?.last ?? snapshot?.bid ?? snapshot?.ask ?? 1;
+  return fallback?.last ?? fallback?.bid ?? fallback?.ask ?? 1;
 }
 
 function weightedAverage(currentQty: number, currentPrice: number, nextQty: number, nextPrice: number) {
@@ -73,7 +97,7 @@ export async function submitPaperOrder(userId: string, rawInput: SubmitOrderInpu
       : normalizeOrderPayload(rawInput);
 
   const portfolio = await getPrimaryPortfolio(userId);
-  const markPrice = await getMarkPrice(input.exchange, input.instrument);
+  const markPrice = await getMarkPrice(input.exchange, input.instrument, input.marketType);
   const risk = validateRisk({
     quantity: input.quantity,
     leverage: input.leverage,
@@ -284,7 +308,7 @@ export async function markPositionsToMarket() {
 
   await Promise.all(
     positions.map(async (position) => {
-      const markPrice = await getMarkPrice("SIMULATED", position.instrument);
+      const markPrice = await getMarkPrice("SIMULATED", position.instrument, position.marketType);
       const direction = position.side === "BUY" ? 1 : -1;
       const unrealizedPnlUsd = (markPrice - position.entryPrice) * position.quantity * direction;
 

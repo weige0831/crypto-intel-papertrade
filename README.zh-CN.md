@@ -2,40 +2,37 @@
 
 [English README](./README.md)
 
-这是一个基于 `Next.js + TypeScript` 的全栈加密货币情报与虚拟仓平台。
+这是一个基于 `Next.js + TypeScript` 的虚拟货币消息面与虚拟仓平台，当前版本重点包括：
 
-这份文档主要写给两类人：
-
-- 只想把项目部署到 Linux 服务器上的使用者
-- 想在本地开发、修改和扩展项目的开发者
-
-## 项目功能
-
-- 监听 Binance 和 OKX 实时市场数据
+- 接入 Binance 和 OKX 官方行情接口
 - 聚合交易所公告与 RSS / 新闻源
-- 支持邮箱验证码注册和密码登录
-- 支持现货与永续合约虚拟仓
-- 每个用户都可以配置兼容 OpenAI 风格接口的 `baseUrl + apiKey + model`
-- 提供管理员后台，用于配置 SMTP、AI 默认参数、数据源和系统更新
-- 提供 Linux 安装脚本与更新脚本
+- 邮箱验证码注册、登录、忘记密码重置
+- 现货 / 永续虚拟仓
+- 每个用户独立的 AI `baseUrl + apiKey + model` 配置
+- 管理员后台与脚本化更新
 
-## 服务组成
+## 当前版本的主要变化
 
-- `web`：前台、用户页面、管理员页面和 API
-- `worker`：行情采集、消息聚合、AI 执行、资金费与强平循环
-- `postgres`：业务数据库
-- `redis`：SSE 和 worker 之间的实时事件总线
+- 认证页拆成独立页面：
+  - `/auth/login`
+  - `/auth/register`
+  - `/auth/forgot-password`
+- `/auth` 现在只负责跳转到 `/auth/login`
+- 公开导航只显示 `登录` 和 `注册`
+- 管理员入口不在公开导航显示，只能手动访问 `/admin`
+- 首页和消息中心默认优先展示消息面，不再默认刷大量 `market_tick`
+- 新增管理员一键重置命令
 
-## 当前界面逻辑
+## 运行服务
 
-- 普通用户通过页面右上角的 `登录 / 注册` 入口进入认证页
-- 注册和登录都在独立的 `/auth` 页面中完成
-- 管理员入口默认不在公开导航中显示
-- 管理员通过手动访问 `/admin` 进入后台；未登录时会自动跳到管理员登录流程
+- `web`：前台、后台、API、SSE
+- `worker`：行情采集、消息聚合、AI 执行、虚拟仓仿真
+- `postgres`：数据库
+- `redis`：实时事件总线
 
-## Ubuntu 最快启动方式
+## Ubuntu 一键快速部署
 
-如果你只想最快部署，在一台全新的 Ubuntu 服务器上执行：
+全新 Ubuntu 服务器可以直接执行：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weige0831/crypto-intel-papertrade/main/scripts/quickstart-ubuntu.sh -o quickstart-ubuntu.sh
@@ -45,12 +42,14 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quicksta
 
 这个脚本会自动：
 
-- 安装缺失的系统依赖
-- 克隆项目代码
+- 安装缺失依赖
+- 克隆仓库
 - 创建 `.env`
 - 生成 `AUTH_SECRET`
 - 生成 `APP_ENCRYPTION_KEY`
-- 启动 PostgreSQL、Redis、web 和 worker
+- 初始化数据库
+- 执行管理员重置
+- 启动 `web`、`worker`、`postgres`、`redis`
 
 默认安装目录：
 
@@ -58,21 +57,9 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quicksta
 $HOME/crypto-intel-papertrade
 ```
 
-安装完成后访问：
+## Ubuntu 手动部署
 
-```text
-http://你的服务器IP:3000
-```
-
-## Ubuntu 详细部署步骤
-
-### 第 1 步：登录服务器
-
-```bash
-ssh your-user@your-server-ip
-```
-
-### 第 2 步：安装 Git
+### 1. 安装 Git
 
 ```bash
 sudo apt update
@@ -80,7 +67,7 @@ sudo apt install -y git
 git --version
 ```
 
-### 第 3 步：安装 Docker Engine 和 Docker Compose 插件
+### 2. 安装 Docker Engine 和 Docker Compose 插件
 
 ```bash
 sudo apt update
@@ -101,21 +88,17 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo systemctl enable --now docker
 sudo docker version
 sudo docker compose version
-sudo docker run hello-world
 ```
 
-### 第 4 步：可选，允许当前用户不带 sudo 运行 Docker
+如果你希望当前用户不带 `sudo` 使用 Docker：
 
 ```bash
 getent group docker || sudo groupadd docker
 sudo usermod -aG docker $USER
 newgrp docker
-docker run hello-world
 ```
 
-如果 `newgrp docker` 没生效，就退出 SSH 重新登录一次。
-
-### 第 5 步：克隆项目
+### 3. 克隆项目
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
@@ -123,59 +106,73 @@ cd crypto-intel-papertrade
 git config core.fileMode false
 ```
 
-### 第 6 步：执行安装脚本
+### 4. 执行安装脚本
 
 ```bash
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
 ```
 
-现在的 `install.sh` 会自动完成这些事情：
+`install.sh` 现在会自动：
 
-- 如果没有 `.env`，自动从 `.env.example` 创建
+- 没有 `.env` 时从 `.env.example` 创建
 - 自动生成 `AUTH_SECRET`
 - 自动生成 `APP_ENCRYPTION_KEY`
-- 自动写入 GitHub 和 GHCR 默认值
+- 自动写入 GitHub / GHCR 默认值
 - 启动 PostgreSQL 和 Redis
-- 在 GHCR 镜像暂时未就绪时重试拉取，再回退到本地 Docker 构建
-- 自动把内置 PostgreSQL 密码和 `.env` 里的 `DATABASE_URL` 对齐
-- 如果存在 `prisma/migrations`，执行 `prisma migrate deploy`
-- 如果暂时还没有迁移文件，自动回退到 `prisma db push`
-- 执行 seed 并启动 `web` 和 `worker`
+- 优先重试拉取 GHCR 镜像，失败时回退本地构建
+- 有迁移时执行 `prisma migrate deploy`
+- 没有迁移文件时自动回退 `prisma db push`
+- 执行系统 seed
+- 执行 `npm run admin:reset` 强制初始化管理员账号
+- 启动 `web` 和 `worker`
 
-### 第 7 步：安装完成后进入后台继续配置
+## 服务器更新
 
-第一次安装完成后，使用管理员账户登录，再到后台配置：
+每次你把新代码推到 `main` 后，在服务器执行：
 
-- SMTP 参数
-- AI 默认参数
-- 数据源参数
-- 维护模式
-- GitHub / GHCR 更新参数
+```bash
+cd ~/crypto-intel-papertrade
+sh scripts/update.sh
+```
+
+`update.sh` 当前会：
+
+- 拉取最新 `main`
+- 更新 `IMAGE_TAG`
+- 优先拉取 GHCR 镜像，失败时回退本地构建
+- 自动同步 `.env` 中的 PostgreSQL 密码
+- 执行 Prisma 迁移或 `db push`
+- 重启服务
+- 检查 `/api/health`
+- 失败时自动回滚
+
+## 重置管理员账号
+
+如果管理员邮箱或密码不对，直接在服务器执行：
+
+```bash
+cd ~/crypto-intel-papertrade
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/reset-admin.sh
+```
+
+这个命令会：
+
+- 更新 `.env` 里的管理员邮箱和密码
+- 确保目标用户角色为 `ADMIN`
+- 标记邮箱已验证
+- 保证该管理员拥有主虚拟仓
 
 ## 本地开发
 
-### 依赖要求
-
-- `Node.js 22`
-- `npm`
-- `Docker`
-- `Docker Compose`
-- `Git`
-
-### 第 1 步：克隆代码
+### 1. 克隆并准备 `.env`
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
-```
-
-### 第 2 步：创建 `.env`
-
-```bash
 cp .env.example .env
 ```
 
-本地开发至少建议改这几个值：
+最低建议值：
 
 ```env
 AUTH_SECRET=local-dev-secret
@@ -184,73 +181,46 @@ ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=admin123456
 ```
 
-### 第 3 步：启动 PostgreSQL 和 Redis
+### 2. 启动基础服务
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-### 第 4 步：安装依赖
+### 3. 安装依赖并初始化
 
 ```bash
 npm install
-```
-
-### 第 5 步：初始化数据库
-
-```bash
 npm run db:generate
 npm run db:push
 npm run db:seed
+npm run admin:reset
 ```
 
-### 第 6 步：启动前端
+### 4. 启动前端
 
 ```bash
 npm run dev
 ```
 
-### 第 7 步：在另一个终端启动 worker
+另一个终端启动 worker：
 
 ```bash
 npm run worker
 ```
 
-### 第 8 步：打开本地站点
-
-```text
-http://localhost:3000
-```
-
-## 服务器更新方式
-
-每次新代码推到 `main` 后，在服务器执行：
-
-```bash
-cd ~/crypto-intel-papertrade
-sh scripts/update.sh
-```
-
-现在的 `update.sh` 会自动执行：
-
-- 拉取最新 `main`
-- 把 `IMAGE_TAG` 切到最新提交 SHA
-- 优先重试拉取 GHCR 镜像，失败后再回退到本地 Docker 构建
-- 自动把内置 PostgreSQL 密码和 `.env` 保持一致
-- 执行 Prisma 迁移或 `db push`
-- 重启服务
-- 做健康检查
-- 如果失败，自动回滚到上一个镜像标签
-
 ## 主要页面
 
-- `/`：总览首页
-- `/auth`：独立注册 / 登录页
-- `/market`：市场情报
-- `/paper-trading`：虚拟仓工作台
-- `/ai-settings`：用户 AI 配置
-- `/alerts`：提醒中心
-- `/admin`：隐藏的管理员入口
+- `/`
+- `/market`
+- `/market/[instrument]`
+- `/alerts`
+- `/paper-trading`
+- `/ai-settings`
+- `/auth/login`
+- `/auth/register`
+- `/auth/forgot-password`
+- `/admin`
 
 ## 常用命令
 
@@ -264,47 +234,15 @@ npm run db:generate
 npm run db:push
 npm run db:migrate
 npm run db:seed
-docker compose up -d postgres redis
-docker compose down
+npm run admin:reset
 sh scripts/install.sh
 sh scripts/update.sh
+sh scripts/reset-admin.sh
 ```
 
-## 常见问题
+## 参考链接
 
-### `docker: command not found`
-
-说明 Docker 没装好，或者当前 shell 还没刷新。
-
-### `permission denied while trying to connect to the Docker daemon socket`
-
-执行：
-
-```bash
-getent group docker || sudo groupadd docker
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-### `port 3000 is already in use`
-
-查看是谁占用了 3000：
-
-```bash
-sudo ss -ltnp | grep 3000
-```
-
-### 邮箱验证码收不到
-
-如果 `SMTP_*` 没配置，开发模式会退回预览模式，只在日志中输出验证码，不会真实发邮件。
-
-## 重要提醒
-
-- 不要把真实密钥提交到 GitHub
-- 所有真实密钥都只应该放在 `.env` 和后台加密存储中
-- 当前 worker 已经具备核心骨架，但如果要长期线上运行，还需要继续加强重试、限频、批处理和交易所兼容细节
-
-## 参考文档
-
+- [Binance Spot REST 行情接口](https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints)
+- [Binance WebSocket Streams](https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams)
+- [OKX API v5 文档](https://my.okx.com/docs-v5/en/)
 - [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)

@@ -1,6 +1,6 @@
 import { AppShell, Panel, StatusPill } from "@/components/chrome";
 import { AiSettingsForm } from "@/components/interactive";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { resolveLocale } from "@/lib/i18n";
 import { requireUserPageSession } from "@/lib/page-auth";
 import { getUserWorkspace } from "@/lib/server/dashboard";
 
@@ -12,37 +12,43 @@ export default async function AiSettingsPage({
   searchParams: Promise<{ lang?: string }>;
 }) {
   const locale = resolveLocale((await searchParams).lang);
-  const dict = getDictionary(locale);
   const session = await requireUserPageSession(locale, "/ai-settings");
   const workspace = await getUserWorkspace(session.sub);
   const isZh = locale === "zh-CN";
 
-  const copy = {
-    subtitle: isZh ? "配置兼容 OpenAI 风格接口的地址、用户私有密钥，以及 AI 自动开仓风控参数。" : "Configure OpenAI-compatible endpoints, encrypted user keys, and risk-limited auto execution.",
-    posture: isZh ? "AI 状态" : "AI posture",
-    controls: isZh ? "控制项" : "Controls",
-    enabled: isZh ? "已启用" : "Enabled",
-    disabled: isZh ? "未启用" : "Disabled",
-    encrypted: isZh ? "API Key 会在服务端加密保存。AI 输出必须先通过结构化交易意图校验，随后才能创建虚拟仓订单。" : "Keys are stored encrypted server-side. AI output is validated against a structured trade intent schema before any paper order is created.",
-    createHint: isZh ? "如果当前还没有个人 AI 配置，下面的表单会为你的账户创建一份专属配置。" : "If no personal config exists yet, the form below will create one scoped to your account.",
-    connection: isZh ? "连接与风险设置" : "Connection and risk settings",
-    compatible: isZh ? "兼容 OpenAI 风格接口" : "OpenAI-compatible",
-  };
-
   return (
-    <AppShell locale={locale} title={dict.sections.aiControl} subtitle={copy.subtitle}>
-      <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-        <Panel title={copy.posture} eyebrow={copy.controls}>
-          <div className="space-y-3">
-            <StatusPill tone={workspace.aiConfig?.isEnabled ? "success" : "warn"}>
-              {workspace.aiConfig?.isEnabled ? copy.enabled : copy.disabled}
-            </StatusPill>
-            <p className="text-sm text-zinc-300">{copy.encrypted}</p>
-            <p className="text-sm text-zinc-400">{copy.createHint}</p>
+    <AppShell
+      locale={locale}
+      title={isZh ? "AI 配置" : "AI settings"}
+      subtitle={
+        isZh
+          ? "每个用户都可以配置自己的 baseUrl、apiKey、模型和风控边界。AI 只能操作虚拟仓，不能操作真实交易账户。"
+          : "Each user can set their own base URL, API key, model, and risk limits. AI is restricted to the paper trading account only."
+      }
+    >
+      <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr]">
+        <Panel title={isZh ? "当前状态" : "Current posture"} eyebrow={isZh ? "风控说明" : "Risk posture"}>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <StatusPill tone={workspace.aiConfig?.isEnabled ? "success" : "warn"}>
+                {workspace.aiConfig?.isEnabled ? (isZh ? "AI 已启用" : "AI enabled") : isZh ? "AI 未启用" : "AI disabled"}
+              </StatusPill>
+              <StatusPill>{isZh ? "仅限虚拟仓" : "Paper trading only"}</StatusPill>
+            </div>
+            <p className="text-sm leading-6 text-slate-300">
+              {isZh
+                ? "你的私有 API Key 会在服务端加密保存。AI 输出必须先通过结构化交易意图校验，再经过风险限制，最后才会创建虚拟仓订单。"
+                : "Your private API key is stored encrypted server-side. AI output must pass structured intent validation and risk checks before it can create a paper order."}
+            </p>
+            <p className="text-sm leading-6 text-slate-400">
+              {isZh
+                ? "如果你还没有个人配置，下面的表单会为当前账号创建一份专属配置。"
+                : "If you do not have a personal config yet, the form below creates one for the current account."}
+            </p>
           </div>
         </Panel>
 
-        <Panel title={copy.connection} eyebrow={copy.compatible}>
+        <Panel title={isZh ? "连接与风险参数" : "Connection and risk controls"} eyebrow={isZh ? "OpenAI 兼容接口" : "OpenAI-compatible gateway"}>
           <AiSettingsForm
             locale={locale}
             initial={
