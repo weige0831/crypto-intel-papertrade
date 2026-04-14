@@ -1,23 +1,83 @@
 # Crypto Intel Papertrade
 
+[中文说明](./README.zh-CN.md)
+
 A full-stack `Next.js + TypeScript` platform for:
 
 - realtime Binance and OKX market monitoring
 - exchange announcement and RSS/news aggregation
-- email-based user onboarding
+- email-based onboarding with verification codes
 - spot and perpetual paper trading
 - per-user OpenAI-compatible AI auto-execution
 - admin-controlled SMTP, GitHub, GHCR, and update settings
 - Linux deployment with Docker Compose, `install.sh`, and `update.sh`
 
-## Stack
+## What it includes
 
-- `Next.js 16` app router
-- `Prisma + PostgreSQL`
-- `Redis` for event fan-out
-- `ws` connectors for Binance and OKX streams
-- `Vitest` for unit coverage
-- `GitHub Actions + GHCR` for image publishing
+- `web`: frontend, admin console, and API routes
+- `worker`: market ingestion, news aggregation, AI execution, funding, and liquidation loops
+- `postgres`: business database
+- `redis`: realtime event fan-out for SSE and worker communication
+
+## Quick deploy
+
+Target: Linux server with `git`, `docker`, and `docker compose`.
+
+```bash
+git clone https://github.com/weige0831/crypto-intel-papertrade.git
+cd crypto-intel-papertrade
+cp .env.example .env
+```
+
+Edit `.env` at minimum:
+
+- `AUTH_SECRET`
+- `APP_ENCRYPTION_KEY`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `OPENAI_COMPAT_API_KEY` if AI auto-execution is needed
+- `SMTP_*` if real email delivery is needed
+
+Then run:
+
+```bash
+chmod +x scripts/install.sh scripts/update.sh
+GITHUB_OWNER=weige0831 ./scripts/install.sh
+```
+
+After install:
+
+- web UI: `http://<your-server-ip>:3000`
+- admin login: `.env` values from `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+
+## Quick local run
+
+```bash
+docker compose up -d postgres redis
+npm install
+npm run db:generate
+npm run db:push
+npm run db:seed
+```
+
+Start the app and worker in separate terminals:
+
+```bash
+npm run dev
+npm run worker
+```
+
+## Update flow
+
+Production update is intentionally simple:
+
+1. Push confirmed changes to `main`
+2. GitHub Actions builds and publishes GHCR images
+3. Admin panel triggers `/api/admin/update`
+4. Server runs `scripts/update.sh`
+5. Compose pulls the new image, runs migrations, restarts services, and health-checks the app
+
+If health checks fail, `update.sh` rolls back to the previous `IMAGE_TAG`.
 
 ## Main routes
 
@@ -29,67 +89,22 @@ A full-stack `Next.js + TypeScript` platform for:
 - `/alerts` unified alert queue
 - `/admin` and nested admin pages
 
-## Local development
-
-1. Copy `.env.example` to `.env` and adjust secrets.
-2. Start infrastructure:
-
-```bash
-docker compose up -d postgres redis
-```
-
-3. Install and prepare the database:
-
-```bash
-npm install
-npm run db:generate
-npm run db:push
-npm run db:seed
-```
-
-4. Run the web app and worker in separate terminals:
+## Main commands
 
 ```bash
 npm run dev
 npm run worker
+npm run lint
+npm run test
+npm run build
+npm run db:generate
+npm run db:push
+npm run db:migrate
+npm run db:seed
 ```
-
-## Deploy with Docker Compose
-
-The repo is designed for a Linux host. Typical flow:
-
-```bash
-export GITHUB_OWNER=weige0831
-git clone https://github.com/$GITHUB_OWNER/crypto-intel-papertrade.git
-cd crypto-intel-papertrade
-cp .env.example .env
-./scripts/install.sh
-```
-
-The admin update endpoint triggers `scripts/update.sh`, which:
-
-- pulls the latest `main`
-- resolves the newest commit SHA
-- switches `IMAGE_TAG`
-- pulls GHCR images
-- runs Prisma deploy migrations
-- restarts `web` and `worker`
-- rolls back the previous `IMAGE_TAG` if health checks fail
-
-## GitHub release flow
-
-On every push to `main`, GitHub Actions:
-
-1. installs dependencies
-2. runs Prisma generate
-3. runs lint and tests
-4. builds the app
-5. builds and pushes:
-   - `ghcr.io/<owner>/crypto-intel-papertrade:main`
-   - `ghcr.io/<owner>/crypto-intel-papertrade:<commit-sha>`
 
 ## Important notes
 
-- AI keys and SMTP passwords are encrypted at rest in the database.
-- The public repository must never contain real `.env` values.
-- The worker implementation is a production-oriented skeleton: it already wires live streams, polling, AI execution, funding, and liquidation loops, but you should still harden rate limits, batching, and exchange-specific edge cases before treating it as production trading infrastructure.
+- Real secrets must never be committed. Use `.env` and admin-side encrypted storage.
+- AI and SMTP secrets are encrypted before being stored in the database.
+- The worker is a strong production-oriented skeleton, but exchange-specific hardening, batching, and operational limits should still be tightened before treating it as a finished live service.
