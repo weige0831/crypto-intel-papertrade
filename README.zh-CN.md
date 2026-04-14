@@ -125,6 +125,7 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts
 - 执行系统 seed
 - 执行 `npm run admin:reset` 强制初始化管理员账号
 - 启动 `web` 和 `worker`
+- 为所有服务写入 `restart: unless-stopped`，保证服务器重启后自动拉起
 
 ## 服务器更新
 
@@ -143,6 +144,7 @@ sh scripts/update.sh
 - 自动同步 `.env` 中的 PostgreSQL 密码
 - 执行 Prisma 迁移或 `db push`
 - 重启服务
+- 保持服务在宿主机重启后自动恢复
 - 检查 `/api/health`
 - 失败时自动回滚
 

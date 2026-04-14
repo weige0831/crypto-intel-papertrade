@@ -116,6 +116,7 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts
 - seed system defaults
 - force-create or reset the admin account with `npm run admin:reset`
 - start `web` and `worker`
+- configure all services with `restart: unless-stopped` so they auto-start after a server reboot
 
 ## Updating the server
 
@@ -132,6 +133,7 @@ sh scripts/update.sh
 - syncs the embedded PostgreSQL password from `.env`
 - runs Prisma migrations or `db push`
 - restarts the stack
+- keeps services auto-starting after host reboot
 - checks `/api/health`
 - rolls back on failure
 
