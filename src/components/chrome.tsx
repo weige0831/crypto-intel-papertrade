@@ -9,20 +9,19 @@ type AppShellProps = {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  showAuthShortcut?: boolean;
 };
 
-export function AppShell({ locale, title, subtitle, children }: AppShellProps) {
+export function AppShell({ locale, title, subtitle, children, showAuthShortcut = true }: AppShellProps) {
   const dict = getDictionary(locale);
   const query = `?lang=${locale}`;
 
   const links = [
     { href: `/${query}`, label: dict.nav.home },
-    { href: `/auth${query}`, label: dict.nav.auth },
     { href: `/market${query}`, label: dict.nav.market },
     { href: `/paper-trading${query}`, label: dict.nav.paperTrading },
     { href: `/ai-settings${query}`, label: dict.nav.aiSettings },
     { href: `/alerts${query}`, label: dict.nav.alerts },
-    { href: `/admin${query}`, label: dict.nav.admin },
   ];
 
   return (
@@ -35,7 +34,16 @@ export function AppShell({ locale, title, subtitle, children }: AppShellProps) {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1>
               {subtitle ? <p className="mt-2 max-w-3xl text-sm text-zinc-300">{subtitle}</p> : null}
             </div>
+
             <div className="flex flex-wrap items-center gap-3 text-sm">
+              {showAuthShortcut ? (
+                <Link
+                  href={`/auth${query}`}
+                  className="rounded-full border border-emerald-300/40 bg-emerald-300/10 px-4 py-2 font-medium text-emerald-100 transition hover:border-emerald-300/70"
+                >
+                  {dict.nav.auth}
+                </Link>
+              ) : null}
               <a
                 className={cn(
                   "rounded-full border px-3 py-1.5 transition hover:border-emerald-300 hover:text-emerald-200",
@@ -56,6 +64,7 @@ export function AppShell({ locale, title, subtitle, children }: AppShellProps) {
               </a>
             </div>
           </div>
+
           <nav className="mt-5 flex flex-wrap gap-2">
             {links.map((link) => (
               <Link

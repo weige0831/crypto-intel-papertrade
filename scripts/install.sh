@@ -43,6 +43,27 @@ compose() {
   docker_cmd compose "$@"
 }
 
+pull_images_with_retry() {
+  attempts="${IMAGE_PULL_RETRIES:-6}"
+  delay="${IMAGE_PULL_DELAY:-10}"
+  current=1
+
+  while [ "$current" -le "$attempts" ]; do
+    if compose pull web worker; then
+      return 0
+    fi
+
+    if [ "$current" -lt "$attempts" ]; then
+      log "Images are not ready yet. Retrying in ${delay}s (${current}/${attempts})..."
+      sleep "$delay"
+    fi
+
+    current=$((current + 1))
+  done
+
+  return 1
+}
+
 has_prisma_migrations() {
   [ -d prisma/migrations ] || return 1
   find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .
@@ -76,6 +97,22 @@ set_env_value() {
 get_env_value() {
   key="$1"
   grep "^${key}=" .env 2>/dev/null | head -n 1 | cut -d '=' -f2-
+}
+
+sync_embedded_postgres_credentials() {
+  database_url="$(get_env_value DATABASE_URL)"
+  [ -n "$database_url" ] || return 0
+
+  db_user="$(printf '%s' "$database_url" | sed -n 's#^[^:]*://\([^:/?]*\):.*#\1#p')"
+  db_password="$(printf '%s' "$database_url" | sed -n 's#^[^:]*://[^:/?]*:\([^@]*\)@.*#\1#p')"
+  db_host="$(printf '%s' "$database_url" | sed -n 's#^[^@]*@\([^:/?]*\).*#\1#p')"
+
+  [ "$db_host" = "postgres" ] || return 0
+  [ "$db_user" = "postgres" ] || return 0
+  [ -n "$db_password" ] || return 0
+
+  escaped_password="$(printf '%s' "$db_password" | sed "s/'/''/g")"
+  compose exec -T postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '${escaped_password}';" >/dev/null 2>&1 || true
 }
 
 prompt_value() {
@@ -190,13 +227,15 @@ ensure_repo() {
 }
 
 ensure_compose_images() {
-  if ! compose pull web worker; then
+  if ! pull_images_with_retry; then
     log "Unable to pull prebuilt images from GHCR, falling back to local build."
     compose build web worker
   fi
 }
 
 prepare_database_schema() {
+  sync_embedded_postgres_credentials
+
   if has_prisma_migrations; then
     log "Applying Prisma migrations..."
     compose run --rm web npm run db:migrate

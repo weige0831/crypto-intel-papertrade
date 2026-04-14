@@ -2,56 +2,40 @@
 
 [English README](./README.md)
 
-这是一个基于 `Next.js + TypeScript` 的全栈虚拟币情报与虚拟仓平台。
+这是一个基于 `Next.js + TypeScript` 的全栈加密货币情报与虚拟仓平台。
 
-它主要提供这些能力：
+这份文档主要写给两类人：
 
-- 监听 Binance 和 OKX 实时行情
-- 聚合交易所公告和 RSS / 新闻源
-- 邮箱验证码注册登录
-- 现货和永续合约虚拟仓
-- 用户自行配置 OpenAI 兼容接口做 AI 自动开仓
-- 管理员后台统一管理 SMTP、AI、数据源、GitHub 和更新设置
-- 通过安装脚本和更新脚本部署到 Linux 服务器
+- 只想把项目部署到 Linux 服务器上的使用者
+- 想在本地开发、修改和扩展项目的开发者
 
-## 这份文档是写给谁的
+## 项目功能
 
-我按两类人来写：
+- 监听 Binance 和 OKX 实时市场数据
+- 聚合交易所公告与 RSS / 新闻源
+- 支持邮箱验证码注册和密码登录
+- 支持现货与永续合约虚拟仓
+- 每个用户都可以配置兼容 OpenAI 风格接口的 `baseUrl + apiKey + model`
+- 提供管理员后台，用于配置 SMTP、AI 默认参数、数据源和系统更新
+- 提供 Linux 安装脚本与更新脚本
 
-- 只想把项目尽快部署起来的人
-- 想在本地开发和修改代码的人
+## 服务组成
 
-## 项目由哪些服务组成
+- `web`：前台、用户页面、管理员页面和 API
+- `worker`：行情采集、消息聚合、AI 执行、资金费与强平循环
+- `postgres`：业务数据库
+- `redis`：SSE 和 worker 之间的实时事件总线
 
-- `web`
-  前台、后台和 API
-- `worker`
-  负责行情接入、消息抓取、AI 执行、资金费和强平循环
-- `postgres`
-  业务数据库
-- `redis`
-  实时事件总线，给 SSE 和 worker 用
+## 当前界面逻辑
 
-## 最快启动方式
+- 普通用户通过页面右上角的 `登录 / 注册` 入口进入认证页
+- 注册和登录都在独立的 `/auth` 页面中完成
+- 管理员入口默认不在公开导航中显示
+- 管理员通过手动访问 `/admin` 进入后台；未登录时会自动跳到管理员登录流程
 
-如果你只想最快把项目跑起来，请直接使用一键快速启动脚本。
+## Ubuntu 最快启动方式
 
-现在的脚本行为已经改成：
-
-- 自动创建 `.env`
-- 自动生成 `AUTH_SECRET`
-- 自动生成 `APP_ENCRYPTION_KEY`
-- 自动填充 GitHub / GHCR 默认值
-- 除了管理员邮箱和密码以外，其他内容都可以安装后再去管理员后台配置
-
-也就是说，首次安装你只需要准备两个值：
-
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-
-### Ubuntu 一键快速开始
-
-在一台全新的 Ubuntu 服务器上执行：
+如果你只想最快部署，在一台全新的 Ubuntu 服务器上执行：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weige0831/crypto-intel-papertrade/main/scripts/quickstart-ubuntu.sh -o quickstart-ubuntu.sh
@@ -59,7 +43,16 @@ chmod +x quickstart-ubuntu.sh
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quickstart-ubuntu.sh
 ```
 
-默认安装目录是：
+这个脚本会自动：
+
+- 安装缺失的系统依赖
+- 克隆项目代码
+- 创建 `.env`
+- 生成 `AUTH_SECRET`
+- 生成 `APP_ENCRYPTION_KEY`
+- 启动 PostgreSQL、Redis、web 和 worker
+
+默认安装目录：
 
 ```text
 $HOME/crypto-intel-papertrade
@@ -71,19 +64,12 @@ $HOME/crypto-intel-papertrade
 http://你的服务器IP:3000
 ```
 
-登录信息就是你刚才提供的：
-
-- 邮箱：`ADMIN_EMAIL`
-- 密码：`ADMIN_PASSWORD`
-
 ## Ubuntu 详细部署步骤
-
-如果你不想直接跑一键脚本，而是希望看到每一步都做了什么，可以按下面的详细步骤来。
 
 ### 第 1 步：登录服务器
 
 ```bash
-ssh 你的用户名@你的服务器IP
+ssh your-user@your-server-ip
 ```
 
 ### 第 2 步：安装 Git
@@ -94,9 +80,7 @@ sudo apt install -y git
 git --version
 ```
 
-### 第 3 步：安装 Docker 和 Docker Compose
-
-下面这些命令按 Docker 官方 Ubuntu 安装文档整理：
+### 第 3 步：安装 Docker Engine 和 Docker Compose 插件
 
 ```bash
 sudo apt update
@@ -120,9 +104,7 @@ sudo docker compose version
 sudo docker run hello-world
 ```
 
-如果最后 `hello-world` 正常输出，说明 Docker 安装成功。
-
-### 第 4 步：可选，让当前用户不用 sudo 也能运行 docker
+### 第 4 步：可选，允许当前用户不带 sudo 运行 Docker
 
 ```bash
 getent group docker || sudo groupadd docker
@@ -131,57 +113,48 @@ newgrp docker
 docker run hello-world
 ```
 
-如果 `newgrp docker` 后还是不生效，就退出 SSH 再重新登录。
+如果 `newgrp docker` 没生效，就退出 SSH 重新登录一次。
 
-### 第 5 步：拉取项目代码
+### 第 5 步：克隆项目
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
+git config core.fileMode false
 ```
 
 ### 第 6 步：执行安装脚本
-
-现在安装脚本已经不要求你先手动编辑完整 `.env`。
-
-只要给它管理员邮箱和密码就可以：
 
 ```bash
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
 ```
 
-当前 `install.sh` 会自动完成：
+现在的 `install.sh` 会自动完成这些事情：
 
-- 创建 `.env`
-- 生成 `AUTH_SECRET`
-- 生成 `APP_ENCRYPTION_KEY`
-- 写入 GitHub 和 GHCR 默认值
-- 自动启用管理员后台更新脚本能力
-- 如果 GHCR 镜像拉取失败，会自动回退到本地构建
+- 如果没有 `.env`，自动从 `.env.example` 创建
+- 自动生成 `AUTH_SECRET`
+- 自动生成 `APP_ENCRYPTION_KEY`
+- 自动写入 GitHub 和 GHCR 默认值
 - 启动 PostgreSQL 和 Redis
-- 执行 Prisma 数据库步骤
-  如果仓库里已经有 `prisma/migrations`，就执行 `prisma migrate deploy`
-  如果还没有迁移文件，就自动回退到 `prisma db push`
-- 启动 `web` 和 `worker`
+- 在 GHCR 镜像暂时未就绪时重试拉取，再回退到本地 Docker 构建
+- 自动把内置 PostgreSQL 密码和 `.env` 里的 `DATABASE_URL` 对齐
+- 如果存在 `prisma/migrations`，执行 `prisma migrate deploy`
+- 如果暂时还没有迁移文件，自动回退到 `prisma db push`
+- 执行 seed 并启动 `web` 和 `worker`
 
-### 第 7 步：安装完成后去后台继续配置
+### 第 7 步：安装完成后进入后台继续配置
 
-安装完成后，下面这些都可以以后再到管理员后台配置，不需要首次安装时手动写进 `.env`：
+第一次安装完成后，使用管理员账户登录，再到后台配置：
 
-- SMTP
-- AI 的 `baseUrl`
-- AI 的 `apiKey`
-- AI 模型
-- 站点信息
-- 数据源配置
+- SMTP 参数
+- AI 默认参数
+- 数据源参数
 - 维护模式
-- GitHub / GHCR 更新配置
+- GitHub / GHCR 更新参数
 
 ## 本地开发
 
-如果你是开发者，想在本地跑起来并改代码，按下面做。
-
-### 本地要求
+### 依赖要求
 
 - `Node.js 22`
 - `npm`
@@ -189,7 +162,7 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts
 - `Docker Compose`
 - `Git`
 
-### 第 1 步：拉取代码
+### 第 1 步：克隆代码
 
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
@@ -202,7 +175,7 @@ cd crypto-intel-papertrade
 cp .env.example .env
 ```
 
-本地开发时，最少改这几个值：
+本地开发至少建议改这几个值：
 
 ```env
 AUTH_SECRET=local-dev-secret
@@ -249,44 +222,35 @@ npm run worker
 http://localhost:3000
 ```
 
-## 以后怎么更新服务器
+## 服务器更新方式
 
-你以后把代码推到 `main` 之后，可以通过两种方式更新：
-
-- 在管理员后台点击更新按钮
-- 在服务器执行下面命令
+每次新代码推到 `main` 后，在服务器执行：
 
 ```bash
 cd ~/crypto-intel-papertrade
 sh scripts/update.sh
 ```
 
-`update.sh` 会自动做这些事情：
+现在的 `update.sh` 会自动执行：
 
 - 拉取最新 `main`
 - 把 `IMAGE_TAG` 切到最新提交 SHA
-- 尝试拉取 GHCR 镜像，失败则自动本地构建
-- 执行数据库迁移
+- 优先重试拉取 GHCR 镜像，失败后再回退到本地 Docker 构建
+- 自动把内置 PostgreSQL 密码和 `.env` 保持一致
+- 执行 Prisma 迁移或 `db push`
 - 重启服务
 - 做健康检查
-- 如果健康检查失败则回滚
+- 如果失败，自动回滚到上一个镜像标签
 
 ## 主要页面
 
-- `/`
-  总览页
-- `/auth`
-  注册和登录
-- `/market`
-  市场情报
-- `/paper-trading`
-  虚拟仓和手动下单
-- `/ai-settings`
-  用户 AI 配置
-- `/alerts`
-  预警和消息流
-- `/admin`
-  管理后台
+- `/`：总览首页
+- `/auth`：独立注册 / 登录页
+- `/market`：市场情报
+- `/paper-trading`：虚拟仓工作台
+- `/ai-settings`：用户 AI 配置
+- `/alerts`：提醒中心
+- `/admin`：隐藏的管理员入口
 
 ## 常用命令
 
@@ -302,6 +266,8 @@ npm run db:migrate
 npm run db:seed
 docker compose up -d postgres redis
 docker compose down
+sh scripts/install.sh
+sh scripts/update.sh
 ```
 
 ## 常见问题
@@ -320,7 +286,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### `3000 端口被占用`
+### `port 3000 is already in use`
 
 查看是谁占用了 3000：
 
@@ -330,15 +296,15 @@ sudo ss -ltnp | grep 3000
 
 ### 邮箱验证码收不到
 
-如果 `SMTP_*` 没配置，开发环境会进入预览模式，也就是只在日志里输出验证码，不会真实发邮件。
+如果 `SMTP_*` 没配置，开发模式会退回预览模式，只在日志中输出验证码，不会真实发邮件。
 
 ## 重要提醒
 
 - 不要把真实密钥提交到 GitHub
-- 所有真实配置都应该只放在 `.env` 和后台加密存储里
-- 现在的 worker 已经具备核心骨架，但如果你要长期线上跑，还应该继续加强重试、限频、批处理和交易所兼容细节
+- 所有真实密钥都只应该放在 `.env` 和后台加密存储中
+- 当前 worker 已经具备核心骨架，但如果要长期线上运行，还需要继续加强重试、限频、批处理和交易所兼容细节
 
 ## 参考文档
 
-- [Docker Engine Ubuntu 安装文档](https://docs.docker.com/engine/install/ubuntu/)
-- [Docker Linux 安装后配置文档](https://docs.docker.com/engine/install/linux-postinstall/)
+- [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Docker Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)

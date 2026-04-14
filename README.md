@@ -1,47 +1,39 @@
 # Crypto Intel Papertrade
 
-[中文文档](./README.zh-CN.md)
+[中文说明](./README.zh-CN.md)
 
 Crypto Intel Papertrade is a full-stack crypto intelligence and paper trading platform built with `Next.js + TypeScript`.
 
-It is meant to be understandable for:
+It is designed for two groups:
 
-- people who only want to deploy it
-- developers who want to run it locally and modify it
+- operators who just want to deploy it on a Linux server
+- developers who want to run it locally and extend it
 
 ## What it does
 
 - listens to Binance and OKX market data
-- aggregates exchange announcements and RSS/news feeds
+- aggregates exchange notices and RSS/news feeds
 - supports email verification registration and password login
 - supports spot and perpetual paper trading
 - lets each user configure an OpenAI-compatible `baseUrl + apiKey + model`
-- provides an admin panel for SMTP, AI defaults, data source settings, GitHub settings, and updates
-- ships with install/update scripts for Linux deployment
+- provides an admin panel for SMTP, AI defaults, source settings, and system updates
+- ships with install and update scripts for Linux deployment
 
 ## Services
 
-- `web`
-  frontend, admin console, and API routes
-- `worker`
-  market ingestion, news aggregation, AI execution, funding, and liquidation loops
-- `postgres`
-  application database
-- `redis`
-  realtime event bus for SSE and worker communication
+- `web`: frontend, user pages, admin pages, and API routes
+- `worker`: market ingestion, news collection, AI execution, funding, and liquidation loops
+- `postgres`: application database
+- `redis`: realtime event bus for SSE and worker communication
 
-## Fastest way to start on Ubuntu
+## UI behavior
 
-If you want the shortest path, use the quickstart script.
+- normal users should use the top-right `Sign in / Register` entry
+- registration and login live on the dedicated `/auth` page
+- the admin console is intentionally hidden from public navigation
+- administrators reach it manually through `/admin`, which redirects to the admin sign-in flow when needed
 
-It installs missing system dependencies, clones the repo, creates `.env`, generates secrets, and only requires:
-
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-
-Everything else can be configured later in the admin panel.
-
-### One-command style quickstart
+## Fastest Ubuntu start
 
 On a fresh Ubuntu server:
 
@@ -50,6 +42,8 @@ curl -fsSL https://raw.githubusercontent.com/weige0831/crypto-intel-papertrade/m
 chmod +x quickstart-ubuntu.sh
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quickstart-ubuntu.sh
 ```
+
+The quickstart script installs missing system dependencies, clones the repo, creates `.env`, generates secrets, and prepares the app.
 
 Default install directory:
 
@@ -63,14 +57,7 @@ After installation, open:
 http://your-server-ip:3000
 ```
 
-Login with:
-
-- email: the `ADMIN_EMAIL` value you provided
-- password: the `ADMIN_PASSWORD` value you provided
-
-## Full Ubuntu deployment steps
-
-If you want to see every command and every step, use the detailed path below.
+## Full Ubuntu deployment
 
 ### Step 1: Connect to the server
 
@@ -87,8 +74,6 @@ git --version
 ```
 
 ### Step 3: Install Docker Engine and Docker Compose plugin
-
-These commands are aligned with the official Docker Ubuntu install guide.
 
 ```bash
 sudo apt update
@@ -112,7 +97,7 @@ sudo docker compose version
 sudo docker run hello-world
 ```
 
-### Step 4: Optional, allow docker without sudo
+### Step 4: Optional, allow Docker without sudo
 
 ```bash
 getent group docker || sudo groupadd docker
@@ -128,45 +113,39 @@ If `newgrp docker` does not take effect, log out and SSH back in.
 ```bash
 git clone https://github.com/weige0831/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
+git config core.fileMode false
 ```
 
 ### Step 6: Run the install script
-
-This is now enough for a basic install:
 
 ```bash
 ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' sh scripts/install.sh
 ```
 
-What `install.sh` now does automatically:
+`install.sh` will:
 
-- creates `.env` if it does not exist
-- generates `AUTH_SECRET`
-- generates `APP_ENCRYPTION_KEY`
-- fills GitHub and GHCR defaults
-- enables admin-triggered update script usage
-- asks only for admin email and password if not passed in
-- pulls GHCR images or falls back to local build
-- starts PostgreSQL and Redis
-- runs Prisma database setup
-  If `prisma/migrations` exists, it uses `prisma migrate deploy`.
-  If no migrations exist yet, it automatically falls back to `prisma db push`.
-- starts `web` and `worker`
+- create `.env` if needed
+- generate `AUTH_SECRET`
+- generate `APP_ENCRYPTION_KEY`
+- fill GitHub and GHCR defaults
+- start PostgreSQL and Redis
+- retry GHCR pulls before falling back to local Docker builds
+- keep the embedded PostgreSQL password aligned with `DATABASE_URL`
+- use `prisma migrate deploy` when migrations exist
+- automatically fall back to `prisma db push` when migrations do not exist yet
+- seed the admin account and start `web` and `worker`
 
-### Step 7: Configure the rest later in admin panel
+### Step 7: Configure the rest in the admin panel
 
-After the first install, you can log in and configure later from the admin panel:
+After first install, log in with the admin account you created and configure:
 
 - SMTP settings
-- AI base URL, API key, and model
-- site settings
-- maintenance mode
+- AI provider defaults
 - source settings
-- GitHub/GHCR update-related settings
+- maintenance mode
+- GitHub and GHCR update settings
 
 ## Local development
-
-If you are another developer and want to run the project locally:
 
 ### Requirements
 
@@ -189,7 +168,7 @@ cd crypto-intel-papertrade
 cp .env.example .env
 ```
 
-For local development, the minimum useful values are:
+Minimum useful local values:
 
 ```env
 AUTH_SECRET=local-dev-secret
@@ -236,44 +215,35 @@ npm run worker
 http://localhost:3000
 ```
 
-## Updating the server later
+## Updating the server
 
-After new code is pushed to `main`, update the server in one of these ways:
-
-- click the update button in the admin panel
-- or run this on the server:
+After new code is pushed to `main`, update the server with:
 
 ```bash
 cd ~/crypto-intel-papertrade
 sh scripts/update.sh
 ```
 
-`update.sh` will:
+`update.sh` now does the following:
 
-- pull the latest `main`
-- move `IMAGE_TAG` to the latest commit SHA
-- pull GHCR images or build locally if needed
-- run database migration
-- restart services
-- health-check the app
-- roll back if the health check fails
+- pulls the latest `main`
+- sets `IMAGE_TAG` to the latest commit SHA
+- retries GHCR image pulls before falling back to a local Docker build
+- keeps the embedded PostgreSQL password aligned with `.env`
+- runs Prisma migrations or `db push`
+- restarts services
+- performs a health check
+- rolls back to the previous image tag if the update fails
 
-## Main pages
+## Main routes
 
-- `/`
-  overview dashboard
-- `/auth`
-  registration and login
-- `/market`
-  market intelligence
-- `/paper-trading`
-  paper trading workspace
-- `/ai-settings`
-  user AI settings
-- `/alerts`
-  alerts and feed stream
-- `/admin`
-  admin console
+- `/`: overview dashboard
+- `/auth`: dedicated registration and login page
+- `/market`: market intelligence
+- `/paper-trading`: paper trading workspace
+- `/ai-settings`: user AI settings
+- `/alerts`: alerts and feed stream
+- `/admin`: hidden admin console entry
 
 ## Common commands
 
@@ -289,6 +259,8 @@ npm run db:migrate
 npm run db:seed
 docker compose up -d postgres redis
 docker compose down
+sh scripts/install.sh
+sh scripts/update.sh
 ```
 
 ## Troubleshooting
@@ -317,12 +289,12 @@ sudo ss -ltnp | grep 3000
 
 ### Email codes are not arriving
 
-If `SMTP_*` is empty, development mode falls back to preview mode and logs the code instead of sending real email.
+If `SMTP_*` is empty, development mode falls back to preview mode and logs the code instead of sending a real email.
 
 ## Important notes
 
 - never commit real secrets to GitHub
-- keep real values only in `.env` and admin-side encrypted storage
+- keep real secrets only in `.env` and encrypted admin-side storage
 - the worker already has the main loops wired, but production hardening is still needed for retries, batching, rate limits, and exchange-specific edge cases
 
 ## References

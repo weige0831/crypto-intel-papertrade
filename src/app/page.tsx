@@ -21,12 +21,12 @@ export default async function Home({
   const copy = {
     volume24h: isZh ? "24 小时成交额" : "24h volume",
     eventBus: isZh ? "实时事件总线" : "Live event bus",
-    eventBusEye: isZh ? "SSE + Redis" : "SSE + Redis",
+    eventBusEye: "SSE + Redis",
     announcements: isZh ? "交易所公告" : "Exchange announcements",
     lanes: isZh ? "平台能力" : "Platform lanes",
     capabilities: isZh ? "能力概览" : "Capabilities",
     marketDesc: isZh ? "跟踪 Binance + OKX 行情、交易所公告和外部新闻。" : "Track Binance + OKX tickers, announcements, and external news.",
-    adminDesc: isZh ? "配置 SMTP、AI 默认参数、GitHub 更新目标和系统状态。" : "Configure SMTP, AI defaults, GitHub update targets, and system health.",
+    alertsDesc: isZh ? "集中查看市场异动、交易所公告和外部消息提醒。" : "Review market alerts, exchange notices, and external news in one place.",
   };
 
   return (
@@ -104,9 +104,9 @@ export default async function Home({
                   <p className="font-semibold">{dict.home.primaryCta}</p>
                   <p className="mt-2 text-sm text-zinc-300">{copy.marketDesc}</p>
                 </Link>
-                <Link href={`/admin?lang=${locale}`} className="rounded-[22px] border border-white/10 bg-black/20 p-4 transition hover:border-amber-300/40">
+                <Link href={`/alerts?lang=${locale}`} className="rounded-[22px] border border-white/10 bg-black/20 p-4 transition hover:border-amber-300/40">
                   <p className="font-semibold">{dict.home.secondaryCta}</p>
-                  <p className="mt-2 text-sm text-zinc-300">{copy.adminDesc}</p>
+                  <p className="mt-2 text-sm text-zinc-300">{copy.alertsDesc}</p>
                 </Link>
               </div>
             </div>

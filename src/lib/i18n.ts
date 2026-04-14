@@ -43,7 +43,7 @@ const dictionaries: Record<AppLocale, Dictionary> = {
     tagline: "面向虚拟仓与实时消息面的加密情报平台",
     nav: {
       home: "总览",
-      auth: "注册 / 登录",
+      auth: "登录 / 注册",
       market: "市场情报",
       paperTrading: "虚拟仓",
       aiSettings: "AI 配置",
@@ -55,7 +55,7 @@ const dictionaries: Record<AppLocale, Dictionary> = {
       subtitle:
         "面向 Binance、OKX 和可扩展新闻源的情报系统，支持邮箱验证码注册、现货与永续虚拟仓、AI 自动开仓，以及管理员一键更新。",
       primaryCta: "进入市场情报",
-      secondaryCta: "进入管理员后台",
+      secondaryCta: "查看提醒中心",
       highlights: ["Binance + OKX 全市场监控", "现货 / 永续虚拟仓", "兼容 OpenAI 风格接口", "GitHub + GHCR 自动更新"],
     },
     sections: {
@@ -80,7 +80,7 @@ const dictionaries: Record<AppLocale, Dictionary> = {
     tagline: "Realtime intelligence for paper crypto execution",
     nav: {
       home: "Overview",
-      auth: "Auth",
+      auth: "Sign in / Register",
       market: "Market Intel",
       paperTrading: "Paper Trading",
       aiSettings: "AI Settings",
@@ -92,7 +92,7 @@ const dictionaries: Record<AppLocale, Dictionary> = {
       subtitle:
         "A Binance + OKX intelligence platform with email onboarding, spot and perpetual simulation, AI auto-trading, and admin-controlled updates.",
       primaryCta: "Open Market Intel",
-      secondaryCta: "Open Admin Console",
+      secondaryCta: "Open Alerts",
       highlights: ["Binance + OKX monitoring", "Spot / perpetual simulation", "OpenAI-compatible AI gateway", "GitHub + GHCR updates"],
     },
     sections: {
