@@ -2,46 +2,75 @@
 
 [中文文档](./README.zh-CN.md)
 
-This project is a full-stack crypto intelligence and paper trading platform built with `Next.js + TypeScript`.
+Crypto Intel Papertrade is a full-stack crypto intelligence and paper trading platform built with `Next.js + TypeScript`.
 
-It is designed for two kinds of readers:
+It is meant to be understandable for:
 
-- someone who just wants to deploy it on a Linux server
-- another developer who wants to run and modify it locally
+- people who only want to deploy it
+- developers who want to run it locally and modify it
 
-## What this project does
+## What it does
 
 - listens to Binance and OKX market data
 - aggregates exchange announcements and RSS/news feeds
 - supports email verification registration and password login
 - supports spot and perpetual paper trading
 - lets each user configure an OpenAI-compatible `baseUrl + apiKey + model`
-- provides an admin panel for SMTP, AI defaults, data source settings, and system updates
-- ships with `install.sh` and `update.sh` for Linux deployment
+- provides an admin panel for SMTP, AI defaults, data source settings, GitHub settings, and updates
+- ships with install/update scripts for Linux deployment
 
-## Service layout
+## Services
 
 - `web`
-  Next.js frontend, admin console, and API routes
+  frontend, admin console, and API routes
 - `worker`
-  market ingestion, intel collection, AI execution, funding, and liquidation loops
+  market ingestion, news aggregation, AI execution, funding, and liquidation loops
 - `postgres`
   application database
 - `redis`
   realtime event bus for SSE and worker communication
 
-## Start here
+## Fastest way to start on Ubuntu
 
-Choose one path:
+If you want the shortest path, use the quickstart script.
 
-1. `I only want to deploy it on a server`
-2. `I want to develop it locally`
+It installs missing system dependencies, clones the repo, creates `.env`, generates secrets, and only requires:
 
-## Path 1: Deploy on Ubuntu server
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
 
-These commands are written for `Ubuntu 22.04/24.04`.
-If your server is Debian-based, they are very similar.
-If your server is CentOS/RHEL/Fedora, adjust the package manager and use the official Docker docs for that distro.
+Everything else can be configured later in the admin panel.
+
+### One-command style quickstart
+
+On a fresh Ubuntu server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/weige0831/crypto-intel-papertrade/main/scripts/quickstart-ubuntu.sh -o quickstart-ubuntu.sh
+chmod +x quickstart-ubuntu.sh
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./quickstart-ubuntu.sh
+```
+
+Default install directory:
+
+```text
+$HOME/crypto-intel-papertrade
+```
+
+After installation, open:
+
+```text
+http://your-server-ip:3000
+```
+
+Login with:
+
+- email: the `ADMIN_EMAIL` value you provided
+- password: the `ADMIN_PASSWORD` value you provided
+
+## Full Ubuntu deployment steps
+
+If you want to see every command and every step, use the detailed path below.
 
 ### Step 1: Connect to the server
 
@@ -59,7 +88,7 @@ git --version
 
 ### Step 3: Install Docker Engine and Docker Compose plugin
 
-These commands are based on the official Docker Ubuntu installation guide.
+These commands are aligned with the official Docker Ubuntu install guide.
 
 ```bash
 sudo apt update
@@ -83,7 +112,7 @@ sudo docker compose version
 sudo docker run hello-world
 ```
 
-### Step 4: Optional, allow running docker without sudo
+### Step 4: Optional, allow docker without sudo
 
 ```bash
 getent group docker || sudo groupadd docker
@@ -92,7 +121,7 @@ newgrp docker
 docker run hello-world
 ```
 
-If `newgrp docker` does not take effect, log out and SSH in again.
+If `newgrp docker` does not take effect, log out and SSH back in.
 
 ### Step 5: Clone the project
 
@@ -101,118 +130,44 @@ git clone https://github.com/weige0831/crypto-intel-papertrade.git
 cd crypto-intel-papertrade
 ```
 
-### Step 6: Create the environment file
+### Step 6: Run the install script
+
+This is now enough for a basic install:
 
 ```bash
-cp .env.example .env
+chmod +x scripts/install.sh scripts/update.sh scripts/quickstart-ubuntu.sh
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='ChangeThisPassword123!' ./scripts/install.sh
 ```
 
-### Step 7: Generate secrets
+What `install.sh` now does automatically:
 
-Run these commands and keep the generated values:
-
-```bash
-openssl rand -hex 32
-openssl rand -hex 32
-```
-
-Use the first value for `AUTH_SECRET`.
-Use the second value for `APP_ENCRYPTION_KEY`.
-
-### Step 8: Edit `.env`
-
-Open the file:
-
-```bash
-nano .env
-```
-
-At minimum, set these values:
-
-```env
-AUTH_SECRET=replace-with-random-secret
-APP_ENCRYPTION_KEY=replace-with-random-secret
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=replace-with-a-strong-password
-GITHUB_OWNER=weige0831
-GITHUB_REPO=crypto-intel-papertrade
-GHCR_IMAGE=ghcr.io/weige0831/crypto-intel-papertrade
-```
-
-If you want AI auto-execution, also set:
-
-```env
-OPENAI_COMPAT_BASE_URL=https://api.openai.com/v1
-OPENAI_COMPAT_API_KEY=your-real-api-key
-OPENAI_COMPAT_MODEL=gpt-4.1-mini
-```
-
-If you want real email verification delivery, also set:
-
-```env
-SMTP_HOST=your-smtp-host
-SMTP_PORT=587
-SMTP_USER=your-smtp-user
-SMTP_PASSWORD=your-smtp-password
-SMTP_FROM_EMAIL=your@email.com
-SMTP_FROM_NAME=Crypto Intel
-```
-
-Save and exit in `nano`:
-
-- `Ctrl+O`
-- `Enter`
-- `Ctrl+X`
-
-### Step 9: Make scripts executable
-
-```bash
-chmod +x scripts/install.sh scripts/update.sh
-```
-
-### Step 10: Run the first installation
-
-```bash
-GITHUB_OWNER=weige0831 ./scripts/install.sh
-```
-
-What this script does:
-
-- pulls the latest repository state
+- creates `.env` if it does not exist
+- generates `AUTH_SECRET`
+- generates `APP_ENCRYPTION_KEY`
+- fills GitHub and GHCR defaults
+- enables admin-triggered update script usage
+- asks only for admin email and password if not passed in
+- pulls GHCR images or falls back to local build
 - starts PostgreSQL and Redis
-- runs Prisma migration/deploy steps
-- seeds the initial admin config
+- runs Prisma database setup
 - starts `web` and `worker`
 
-### Step 11: Open the site
+### Step 7: Configure the rest later in admin panel
 
-Open in your browser:
+After the first install, you can log in and configure later from the admin panel:
 
-```text
-http://your-server-ip:3000
-```
+- SMTP settings
+- AI base URL, API key, and model
+- site settings
+- maintenance mode
+- source settings
+- GitHub/GHCR update-related settings
 
-Login with:
+## Local development
 
-- email: the value of `ADMIN_EMAIL`
-- password: the value of `ADMIN_PASSWORD`
+If you are another developer and want to run the project locally:
 
-### Step 12: Update later
-
-After you push new code to `main`, update the server with either:
-
-- the admin panel update button
-- or the server command below
-
-```bash
-./scripts/update.sh
-```
-
-## Path 2: Local development
-
-If you are another developer and want to work on the code locally, this is the simplest path.
-
-### Local requirements
+### Requirements
 
 - `Node.js 22`
 - `npm`
@@ -233,7 +188,7 @@ cd crypto-intel-papertrade
 cp .env.example .env
 ```
 
-For local development, you can keep most defaults and only change:
+For local development, the minimum useful values are:
 
 ```env
 AUTH_SECRET=local-dev-secret
@@ -248,7 +203,7 @@ ADMIN_PASSWORD=admin123456
 docker compose up -d postgres redis
 ```
 
-### Step 4: Install npm dependencies
+### Step 4: Install dependencies
 
 ```bash
 npm install
@@ -274,11 +229,33 @@ npm run dev
 npm run worker
 ```
 
-### Step 8: Open the local site
+### Step 8: Open the site
 
 ```text
 http://localhost:3000
 ```
+
+## Updating the server later
+
+After new code is pushed to `main`, update the server in one of these ways:
+
+- click the update button in the admin panel
+- or run this on the server:
+
+```bash
+cd ~/crypto-intel-papertrade
+./scripts/update.sh
+```
+
+`update.sh` will:
+
+- pull the latest `main`
+- move `IMAGE_TAG` to the latest commit SHA
+- pull GHCR images or build locally if needed
+- run database migration
+- restart services
+- health-check the app
+- roll back if the health check fails
 
 ## Main pages
 
@@ -337,21 +314,17 @@ Check what is using it:
 sudo ss -ltnp | grep 3000
 ```
 
-Then stop the conflicting process or change the published port in `docker-compose.yml`.
-
 ### Email codes are not arriving
 
-If `SMTP_*` is empty, the project falls back to preview mode in development and logs the code instead of sending real email.
+If `SMTP_*` is empty, development mode falls back to preview mode and logs the code instead of sending real email.
 
 ## Important notes
 
 - never commit real secrets to GitHub
 - keep real values only in `.env` and admin-side encrypted storage
-- the worker already has the core loops wired, but production hardening is still needed for rate limits, retries, batching, and exchange edge cases
+- the worker already has the main loops wired, but production hardening is still needed for retries, batching, rate limits, and exchange-specific edge cases
 
 ## References
-
-Docker install commands in this README were aligned with the official Docker docs for Ubuntu and Linux post-install steps:
 
 - [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 - [Docker Linux post-installation steps](https://docs.docker.com/engine/install/linux-postinstall/)

@@ -1,8 +1,42 @@
 #!/usr/bin/env sh
 set -eu
 
-APP_DIR="${APP_DIR:-$(pwd)}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+DEFAULT_APP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+
+APP_DIR="${APP_DIR:-$DEFAULT_APP_DIR}"
 BRANCH="${BRANCH:-main}"
+
+docker_cmd() {
+  if docker info >/dev/null 2>&1; then
+    docker "$@"
+    return
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    sudo docker "$@"
+    return
+  fi
+
+  echo "Docker is installed but current user cannot access it."
+  exit 1
+}
+
+compose() {
+  docker_cmd compose "$@"
+}
+
+set_env_value() {
+  key="$1"
+  value="$2"
+  escaped_value="$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')"
+
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s/^${key}=.*/${key}=${escaped_value}/" .env
+  else
+    printf '\n%s=%s\n' "$key" "$value" >> .env
+  fi
+}
 
 cd "$APP_DIR"
 
@@ -15,34 +49,34 @@ PREVIOUS_TAG="$(grep '^IMAGE_TAG=' .env 2>/dev/null | cut -d '=' -f2- || true)"
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
-NEXT_TAG="$(git rev-parse origin/${BRANCH})"
+NEXT_TAG="$(git rev-parse "origin/${BRANCH}")"
 
 if [ -z "$NEXT_TAG" ]; then
   echo "Unable to resolve target image tag"
   exit 1
 fi
 
-if ! grep -q '^IMAGE_TAG=' .env; then
-  printf '\nIMAGE_TAG=%s\n' "$NEXT_TAG" >> .env
-else
-  sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${NEXT_TAG}/" .env
-fi
+set_env_value IMAGE_TAG "$NEXT_TAG"
 
 rollback() {
   echo "Health check failed, rolling back"
   if [ -n "$PREVIOUS_TAG" ]; then
-    sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${PREVIOUS_TAG}/" .env
-    docker compose pull web worker || true
-    docker compose up -d web worker
+    set_env_value IMAGE_TAG "$PREVIOUS_TAG"
+    compose pull web worker || true
+    compose up -d web worker
   fi
 }
 
 trap rollback INT TERM HUP
 
-docker compose pull web worker || true
-docker compose up -d postgres redis
-docker compose run --rm web npm run db:migrate
-docker compose up -d --remove-orphans web worker
+if ! compose pull web worker; then
+  echo "Unable to pull GHCR images, trying local build"
+  compose build web worker
+fi
+
+compose up -d postgres redis
+compose run --rm web npm run db:migrate
+compose up -d --remove-orphans web worker
 
 sleep 12
 
